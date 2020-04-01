@@ -86,6 +86,10 @@ def random_rotate(image_list: list):
     if not isinstance(image_list, list ):
         raise TypeError(f'Expected list of images as input, but got {type(image_list)}')
 
-    return image_list
+    theta = np.random.randint(0,360,1)
+    out = []
+    for image in image_list:
+        out.append(transform.rotate(image, angle=theta, resize='true'))
 
+    return out
 
