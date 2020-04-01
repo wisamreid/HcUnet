@@ -1,5 +1,6 @@
 import torch
 import skimage.transform as transform
+import scipy.ndimage as ndimage
 import skimage.exposure as exposure
 import numpy as np
 import matplotlib.pyplot as plt
@@ -86,10 +87,11 @@ def random_rotate(image_list: list):
     if not isinstance(image_list, list ):
         raise TypeError(f'Expected list of images as input, but got {type(image_list)}')
 
-    theta = np.random.randint(0,360,1)
+    theta = np.random.randint(0, 360, 1)[0]
     out = []
     for image in image_list:
-        out.append(transform.rotate(image, angle=theta, resize='true'))
+        rot_image = ndimage.rotate(image, angle=theta, reshape='true')
+        out.append(rot_image)
 
     return out
 
