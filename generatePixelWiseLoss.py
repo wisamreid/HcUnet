@@ -81,6 +81,7 @@ def loop(pwl, bigmask, image_shape, find_closest):
 pwl = loop(pwl, bigmask, image_shape, find_closest)
 pwl = pwl[:, 50:-50:1, 50:-50:1]
 
+
 io.imsave('pwl_a.tif', pwl.astype(np.float64))
 
 

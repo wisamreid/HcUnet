@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 
 class stack(Dataset):
 
-    def __init__(self, path, mask_transforms, pwl_trasnforms, image_transforms, joint_transforms):
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms):
         """
         CSV File has a list of locations to other minibatch
 
@@ -23,9 +23,8 @@ class stack(Dataset):
         """
 
         self.image_transforms = image_transforms
-        self.mask_transforms = mask_transforms
+        self.out_transforms = out_transforms
         self.joint_transforms = joint_transforms
-        self.pwl_transforms = pwl_trasnforms
 
         self.files = glob.glob(f'{path}{os.sep}*.mask.tif')
 
@@ -51,7 +50,7 @@ class stack(Dataset):
 
         image = io.imread(image_data_path)
         mask = io.imread(mask_path)
-        pwl = pickle.load(open(pwl_data_path,'rb'))
+        pwl = pickle.load(open(pwl_data_path, 'rb'))
 
         # We have to assume there is always a channel index at the last dim
         # So for 3D its [Z,Y,X,C]
@@ -61,17 +60,13 @@ class stack(Dataset):
 
         # May Turn to Torch
 
-        for mt in self.mask_transforms:
-            mask = mt(mask)
-
-        for pwlt in self.pwl_transforms:
-            pwl = pwlt(pwl)
-
-        for it in self.image_transforms:
-            image = it(image)
 
         for jt in self.joint_transforms:
             image, mask, pwl = jt([image, mask, pwl])
+        for it in self.image_transforms:
+            image = it(image)
+        for ot in self.out_transforms:
+            image, mask, pwl = ot([image, mask, pwl])
 
 
         return image, mask, pwl
