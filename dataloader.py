@@ -4,6 +4,7 @@ from skimage import io
 from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
+import pickle
 
 
 # Ignore warnings
@@ -45,12 +46,12 @@ class stack(Dataset):
         file_with_mask = os.path.splitext(self.files[item])[0]
 
         image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
-        pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
+        pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.pkl'
         mask_path = self.files[item]
 
         image = io.imread(image_data_path)
         mask = io.imread(mask_path)
-        pwl = io.imread(pwl_data_path)
+        pwl = pickle.load(open(pwl_data_path,'rb'))
 
         # We have to assume there is always a channel index at the last dim
         # So for 3D its [Z,Y,X,C]

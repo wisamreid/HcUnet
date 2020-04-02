@@ -95,3 +95,20 @@ def random_rotate(image_list: list):
 
     return out
 
+class normalize:
+
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, image):
+        shape = image.shape
+        if image.ndim == 4:
+            for channel in range(shape[-1]):
+                image[:,:,:,channel] = (image[:,:,:,channel] - self.mean[channel]) / self.std[channel]
+
+        if image.ndim == 3:
+            for channel in range(shape[-1]):
+                image[:,:,channel] = (image[:,:,channel] - self.mean[channel]) / self.std[channel]
+                    
+        return images
