@@ -147,12 +147,12 @@ class GenericUnet(nn.Module):
         x = F.relu(self.second_down_conv[-1](x))
 
         # Go Up the U: Decoding
-        for conv1, conv2, up_conv, previous_image, in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv, down_step_images[::-1]):
+        for conv1, conv2, up_conv,  in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv):
             print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
             x = up_conv(x)
-            print(f'Step: {step_counter}-cat: {x.shape} -> {previous_image.shape}')
+            print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
             #print(x.shape,self.crop(previous_image, x).shape )
-            x = torch.cat((x, self.crop(previous_image, x)), dim=1)
+            x = torch.cat((x, self.crop(down_step_images.pop(), x)), dim=1)
 
             print(f'Step: {step_counter}-1: {x.shape}')
             x = F.relu(conv1(x))
