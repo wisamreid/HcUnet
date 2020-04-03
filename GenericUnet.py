@@ -134,9 +134,9 @@ class GenericUnet(nn.Module):
 
         # Go down the U: Encoding
         for conv1, conv2 in zip(self.first_down_conv[0:-1:1], self.second_down_conv[0:-1:1]):
-            print(f'Step: {step_counter}-1: {x.shape}')
+            #print(f'Step: {step_counter}-1: {x.shape}')
             x = F.relu(conv1(x))
-            print(f'Step: {step_counter}-1: {x.shape}')
+            #print(f'Step: {step_counter}-1: {x.shape}')
             x = F.relu(conv2(x))
             down_step_images.append(x)
             x = self.max_pool(x)
@@ -148,15 +148,15 @@ class GenericUnet(nn.Module):
 
         # Go Up the U: Decoding
         for conv1, conv2, up_conv,  in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv):
-            print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
+            #print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
             x = up_conv(x)
-            print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
+            #print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
             #print(x.shape,self.crop(previous_image, x).shape )
             x = torch.cat((x, self.crop(down_step_images.pop(), x)), dim=1)
 
-            print(f'Step: {step_counter}-1: {x.shape}')
+            #print(f'Step: {step_counter}-1: {x.shape}')
             x = F.relu(conv1(x))
-            print(f'Step: {step_counter}-1: {x.shape}')
+            #print(f'Step: {step_counter}-1: {x.shape}')
             x = F.relu(conv2(x))
 
             step_counter += 1
