@@ -115,8 +115,14 @@ def random_rotate(image_list: list):
     theta = np.random.randint(0, 360, 1)[0]
     out = []
     for image in image_list:
-        rot_image = ndimage.rotate(image, angle=theta, reshape='true', cval=np.min(image))
-        rot_image[rot_image < 0] = 0
+        rot_image = ndimage.rotate(image,
+                                   angle=theta,
+                                   reshape='false',
+                                   order=0,
+                                   mode='wrap',
+                                   prefilter=False,
+                                   )
+        # rot_image[rot_image < 0] = 0
         out.append(rot_image)
 
     return out
@@ -154,7 +160,7 @@ class random_crop:
         :return:
         """
         if not type(image_list) == list:
-            raise ValueError(f'Expected input to be list but got {type(image)}')
+            raise ValueError(f'Expected input to be list but got {type(image_list)}')
         out = []
 
         if image_list[0].ndim == 4:  # 3D image
