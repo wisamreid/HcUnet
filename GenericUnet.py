@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pickle
 
 class GenericUnet(nn.Module):
     def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d),
                  in_channels=3,
                  out_channels=2,
-                 feature_sizes=[64, 128, 256, 512, 1024],
+                 feature_sizes=[32, 64, 128, 256, 512, 1024],
                  kernel=(3, 3),
                  upsample_kernel=(2, 2),
                  max_pool_kernel=(2, 2),
@@ -35,6 +36,7 @@ class GenericUnet(nn.Module):
         """
         super(GenericUnet, self).__init__()
 
+
         # Convert to dict of parameters
         #  In order to allow for multiple values passed to the first and second step of each convolution,
         #  we construct a tuple wit values of 'conv1' and 'conv2 denoting the parameter for each step
@@ -53,6 +55,19 @@ class GenericUnet(nn.Module):
         for i, f in enumerate(feature_sizes[0:-1:1]):
             assert f*2 == feature_sizes[i+1], \
                 f'Feature Sizes must be multiples of two from each other: {f} != {feature_sizes[i-1]}*2'
+
+        self.model_specification = {
+            'conv_functions': conv_functions,
+            'in_channels': in_channels,
+            'out_channels': out_channels,
+            'feature_sizes': feature_sizes,
+            'kernel': kernel,
+            'upsample_kernel': upsample_kernel,
+            'max_pool_kernel': max_pool_kernel,
+            'upsample_stride': upsample_stride,
+            'dilation': dilation,
+            'groups':groups
+                                    }
 
         self.first_down_conv = []
         self.second_down_conv = []
@@ -188,3 +203,35 @@ class GenericUnet(nn.Module):
             cropped_tensor = x[:, :, 0:shape_y[2]:1, 0:shape_y[3]:1, 0:shape_y[4]:1]
 
         return cropped_tensor
+
+    def save(self):
+
+        model = {'state_dict': self.state_dict(),
+                 'model_specifications': self.model_specification}
+
+        pickle.dump(model, open('model.unet', 'wb'))
+        return None
+
+    def load(self, path):
+
+        model = pickle.load(open(path, 'rb'))
+        model_specification = model['model_specifications']
+
+        self.__init__(
+                 conv_functions=model_specification['conv_functions'],
+                 in_channels=model_specification['in_channels'],
+                 out_channels=model_specification['out_channels'],
+                 feature_sizes=model_specification['feature_sizes'],
+                 kernel=model_specification['kernel'],
+                 upsample_kernel=model_specification['upsample_kernel'],
+                 max_pool_kernel=model_specification['max_pool_kernel'],
+                 upsample_stride=model_specification['upsample_stride'],
+                 dilation=model_specification['dilation'],
+                 groups=model_specification['groups'],
+                 )
+
+        self.load_state_dict(model['state_dict'])
+        self.eval()
+        return None
+
+
