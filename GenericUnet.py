@@ -214,12 +214,8 @@ class GenericUnet(nn.Module):
 
     def load(self, path):
 
-	try:
-		model = pickle.load(open(path, 'rb'))
-	except:
-		raise FileNotFoundError('Could not find valid model file.)
-	
-		model_specification = model['model_specifications']
+        model = pickle.load(open(path, 'rb'))
+        model_specification = model['model_specifications']
 
         self.__init__(
                  conv_functions=model_specification['conv_functions'],
