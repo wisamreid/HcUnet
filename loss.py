@@ -40,4 +40,4 @@ def dice_loss(pred, mask):
 
     loss = (2 * intersection.sum()) / union
 
-    return torch.abs(1 / (loss + 1e-10))
+    return (1 / (loss + 1e-10)) ** 2

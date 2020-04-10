@@ -102,6 +102,40 @@ def random_gamma(image: np.float):
 
     return exposure.adjust_gamma(image, factor)
 
+def random_affine(image_list: list):
+    """
+    Expects a list of numpy.ndarrays of the smame shape. Ranomly generates an affine
+    tranformation matrix that transforms only the x,y dimmension
+    and applies it to all images in list
+    :param image_lsit:
+    :return:
+    """
+    if not isinstance(image_list, list):
+        raise TypeError(f'Expected list of images as input, but got {type(image_list)}')
+
+    min_shear_x = .8
+    max_shear_x = 1
+
+    min_shear_y = .8
+    max_shear_y = 1
+
+    translation_x, translation_y = np.random.uniform(0, .5, size=2)
+
+    # generate affine matrix
+    mat = np.eye(image_list[0].ndim)
+
+    mat[0,1] = translation_x
+    mat[1,0] = translation_y
+
+    out = []
+    print(mat)
+
+    for image in image_list:
+        out.append(ndimage.affine_transform(image, mat, order=0, output_shape=image.shape, mode='reflect'))
+
+    return out
+
+
 def random_rotate(image_list: list):
     """
     Expects a list of numpy.ndarrays of all the same shape. Randonmly rotates the image along x or y dimmension
