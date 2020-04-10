@@ -1,5 +1,4 @@
 import torch
-from models import Unet3D as Unet
 from GenericUnet import GenericUnet as GUnet
 import numpy as np
 import torch.nn as nn
