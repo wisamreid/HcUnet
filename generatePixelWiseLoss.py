@@ -1,9 +1,12 @@
 import numpy as np
+import numpy as np
 import skimage.io as io
 from numba import njit
+import pickle
 import matplotlib.pyplot as plt
 
 mask = io.imread('Data/colo_test.tif')  # np.uint16
+print(mask.shape)
 ms = mask.shape
 bigmask = np.zeros((ms[0], ms[1] + 100, ms[2] + 100, ms[3]))
 bigmask[:, 50:ms[1] + 50, 50:ms[2] + 50, :] = mask
@@ -64,7 +67,7 @@ def find_closest(bigmask, z, y, x):
                     # print(lens, w0 * np.exp(-1 * ((lens[0] + lens[1]) ** 2) / (2 * (sigma ** 2))))
                     return w0 * np.exp(-1 * ((lens[0] + lens[1]) ** 2) / (2 * (sigma ** 2)))
 
-    return 1
+    return 0
 
 
 # @njit
@@ -80,16 +83,9 @@ def loop(pwl, bigmask, image_shape, find_closest):
 
 pwl = loop(pwl, bigmask, image_shape, find_closest)
 pwl = pwl[:, 50:-50:1, 50:-50:1]
-
-
+pwl_add = pwl + 1
+pickle.dump(pwl_add, open('pwl.pkl','wb'))
 io.imsave('pwl_a.tif', pwl.astype(np.float64))
-
-
-
-
-
-
-
 
 
 
