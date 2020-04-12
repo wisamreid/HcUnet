@@ -123,10 +123,8 @@ def random_affine(image_list: list):
 
     # generate affine matrix
     mat = np.eye(image_list[0].ndim)
-
     mat[0,1] = translation_x
     mat[1,0] = translation_y
-
     out = []
     print(mat)
 

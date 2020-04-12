@@ -39,10 +39,11 @@ def dice_loss(pred, mask):
         raise IndexError(f'Unexpected number of predicted mask dimmensions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimmensions: {pred_shape}')
 
+    pred = torch.sigmoid(pred)
     intersection = pred * mask
-    union = (pred ** 2).sum() + (mask ** 2).sum()
+    union = (pred + mask).sum()
 
-    loss = (2 * intersection.sum()) / union
+    loss = (2*intersection.sum()+1e-10 ) / (union+1e-10)
 
-    return 1-loss.abs()
+    return 1-loss
 

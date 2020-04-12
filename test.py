@@ -20,7 +20,7 @@ data = dataloader.stack(path='./Data',
                         joint_transforms=[t.to_float,
                                           t.reshape,
                                           #t.random_crop([250, 250, 19]),
-                                          #t.random_affine,
+                                          t.random_affine,
                                           #t.random_rotate,
                                           ],
                         image_transforms=[
@@ -74,3 +74,6 @@ image, mask, pwl = data[0]
 
 
 out = utils.pad_image_with_reflections(image, (30, 30, 6))
+for i in [6]:
+    plt.imshow(out[0,1,:,:,i])
+    plt.show()
