@@ -19,14 +19,14 @@ def get_min(image):
 data = dataloader.stack(path='./Data',
                         joint_transforms=[t.to_float,
                                           t.reshape,
-                                          #t.random_crop([250, 250, 19]),
-                                          #t.random_affine,
-                                          #t.random_rotate,
+                                          t.random_crop([250, 250, 19]),
+                                          t.random_affine,
+                                          t.random_rotate,
                                           ],
                         image_transforms=[
-                                          #t.random_gamma,
-                                          #t.spekle,
-                                          #t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5])
+                                          t.random_gamma(gamma_range=(.5, 1.5)),
+                                          t.spekle,
+                                          t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5])
                                           ],
                         out_transforms=[t.to_tensor]
                         )
@@ -46,7 +46,7 @@ test.save()
 test.load('model.unet')
 image, mask, pwl = data[0]
 
-test.evaluate(image)
+#test.evaluate(image)
 
 # for i in range(19):
 #

@@ -235,7 +235,6 @@ class GenericUnet(nn.Module):
                  )
 
         self.load_state_dict(model['state_dict'])
-
         self.eval()
         return None
 
@@ -247,22 +246,34 @@ class GenericUnet(nn.Module):
 
         self.eval()
 
-        pad = (50, 50, 8)
+        pad = (100, 100, 8)
         mask = torch.zeros([image.shape[0],
                             self.model_specification['out_channels'],
                             image.shape[2],
                             image.shape[3],
                             image.shape[4]])
 
-        skip = 100
+        skip = 200
+        trusted_image_size = 100
 
-        for x in torch.arange(0, image.shape[2]), skip:
-            for y in torch.arange(0, image.shape[3], skip):
-                padded_image = pad_image_with_reflections(image[:,:,x:x+skip, y:y+skip, :], pad)
-                mask = self.forward(image)[:, :,
-                       pad[0] // 2:skip + pad[0] // 2,
-                       pad[1] // 2:skip + pad[1] // 2,
-                       pad[2] // 2: -pad[2] // 2:1]
+        padded_image = pad_image_with_reflections(image, pad).float()
+
+        for x in torch.arange(0, padded_image.shape[2], skip):
+            print(x)
+            for y in torch.arange(0, padded_image.shape[3], skip):
+                x = int(x)
+                y = int(y)
+
+                try:
+                    slice_to_eval = padded_image[:, :, x:x+skip, y:y+skip, : ]
+                except IndexError:
+                    slice_to_eval = padded_image[:, :, x::, y::, :]
+
+                mask_slice = self.forward(slice_to_eval)[:, :,
+                                                         pad[0] // 2:skip,
+                                                         pad[1] // 2:skip,
+                                                         pad[2] // 2: image.shape[3]:1]
+
 
 
 

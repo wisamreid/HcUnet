@@ -1,18 +1,29 @@
 import torch
-import skimage.transform as transform
 import scipy.ndimage as ndimage
 import skimage.exposure as exposure
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def joint_transform(func):
-    def wrapper(image_list):
+    """
+    This wrapper generates a seed value for each transform and passes an image from a list to that function
+    It then passes images from a list to the function one at a time and returns a list of outputs
+
+    :param func: Function with arguments 'image' and 'seed'
+    :return: Wrapped function that can now accept lists
+    """
+    def wrapper(*args):
+        image_list = args[-1]  # In the case of a class function, there may be two args, one is 'self'
+                               # We only want to take the last argument, which should always be the image list
         if not type(image_list) == list:
             image_list = [image_list]
         out = []
+        seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
-            out.append(func(im))
+            if len(args) > 1:
+                out.append(func(args[0], image=im, seed=seed))
+            else:
+                out.append(func(image=im, seed=seed))
         if len(out) == 1:
             out = out[0]
         return out
@@ -29,12 +40,11 @@ def int16_to_float(image: np.int16):
 def int8_to_float(image: np.int) -> np.ndarray:
     if not image.dtype == 'uint8':
         raise TypeError(f'Expected image datatype to be uint8 but got {image.dtype}')
-
     return(image/255).astype(np.float)
 
 
 @joint_transform
-def to_float(image):
+def to_float(image, seed=None):
     if image.dtype == 'uint16':
         out = (image/2**16).astype(np.float)
     elif image.dtype == 'uint8':
@@ -45,19 +55,24 @@ def to_float(image):
         raise TypeError(f'Expected image datatype of uint8 or uint16 but got {image.dtype}')
     return out
 
-def to_tensor(image_list: list) -> torch.tensor:
-    if not isinstance(image_list, list):
-        raise TypeError(f'Expected list but got {type(image_list)}')
-    out = []
-    for image in image_list:
-        num_dims = len(image.shape)
-        image = torch.tensor(image)
-        out.append(image.unsqueeze(0).transpose(num_dims, 0).squeeze(dim=image.dim()).unsqueeze(0))
+@joint_transform
+def to_tensor(image):
+    """
+    Function which reformats a numpy array of [x,y,z,c] to [1, c, x, y, z]
 
+    :param image: 2D or 3D ndarray with the channel in the last index
+    :return: 2D or 3D torch.Tensor formated for input into a convolutional neural net
+    """
+    if not isinstance(image, np.ndarray):
+        raise TypeError(f'Expected list but got {type(image)}')
+    num_dims = len(image.shape)
+    image = torch.tensor(image)
+    # Performs these operations in this order...
     # [x,y,z,c] -> [1,x,y,z,c] -> [c,x,y,z,1] -> [c,x,y,z] -> [1,c,x,y,z]
-    return out
+    return image.unsqueeze(0).transpose(num_dims, 0).squeeze(dim=image.dim()).unsqueeze(0)
 
-def reshape(image_list: list):
+@joint_transform
+def reshape(image, seed=None):
     """
     Expects image dimmensions to be [Z,Y,X,C] or [Y,X,C]
         (this is how skimage.io.imread outputs 3D tifs), we add a channel if necessary
@@ -67,15 +82,9 @@ def reshape(image_list: list):
     :param image:
     :return:
     """
-    if not isinstance(image_list, list):
-        raise TypeError(f'Expected input type of list but got {type(image_list)}')
-
-    out = []
-
-    for image in image_list:
-        out.append(image.swapaxes(len(image.shape)-2, 0))
-
-    return out
+    if not isinstance(image, np.ndarray):
+        raise TypeError(f'Expected input type of np.ndarray but got {type(image)}')
+    return image.swapaxes(len(image.shape)-2, 0)
 
 
 def spekle(image):
@@ -92,17 +101,21 @@ def spekle(image):
 
     return image
 
-def random_gamma(image: np.float):
-    if not image.dtype == 'float':
-        raise TypeError(f'Expected image dataype to be float but got {image.dtype}')
+class random_gamma:
+    def __init__(self, gamma_range=(.5, 1.5)):
+        self.gamma_range = gamma_range
+    def __call__(self, image: np.float):
+        print(image)
+        if not image.dtype == 'float':
+            raise TypeError(f'Expected image dataype to be float but got {image.dtype}')
 
-    factor = np.random.uniform(.5, 1.5, 1)
-    if factor < 0:
-        factor = 0
+        factor = np.random.uniform(self.gamma_range[0], self.gamma_range[1], 1)
+        if factor < 0:
+            factor = 0
+        return exposure.adjust_gamma(image, factor)
 
-    return exposure.adjust_gamma(image, factor)
-
-def random_affine(image_list: list):
+@joint_transform
+def random_affine(image, seed):
     """
     Expects a list of numpy.ndarrays of the smame shape. Ranomly generates an affine
     tranformation matrix that transforms only the x,y dimmension
@@ -110,31 +123,22 @@ def random_affine(image_list: list):
     :param image_lsit:
     :return:
     """
-    if not isinstance(image_list, list):
-        raise TypeError(f'Expected list of images as input, but got {type(image_list)}')
+    if not isinstance(image, np.ndarray):
+        raise TypeError(f'Expected list of images as input, but got {type(image)}')
 
-    min_shear_x = .8
-    max_shear_x = 1
-
-    min_shear_y = .8
-    max_shear_y = 1
-
+    np.random.seed(seed)
     translation_x, translation_y = np.random.uniform(0, .5, size=2)
 
     # generate affine matrix
-    mat = np.eye(image_list[0].ndim)
-    mat[0,1] = translation_x
-    mat[1,0] = translation_y
-    out = []
-    print(mat)
+    mat = np.eye(image.ndim)
+    mat[0, 1] = translation_x
+    mat[1, 0] = translation_y
 
-    for image in image_list:
-        out.append(ndimage.affine_transform(image, mat, order=0, output_shape=image.shape, mode='reflect'))
-
-    return out
+    return ndimage.affine_transform(image, mat, order=0, output_shape=image.shape, mode='reflect')
 
 
-def random_rotate(image_list: list):
+@joint_transform
+def random_rotate(image, seed):
     """
     Expects a list of numpy.ndarrays of all the same shape. Randonmly rotates the image along x or y dimmension
     and returns list of rotated images
@@ -142,48 +146,41 @@ def random_rotate(image_list: list):
     :param image:
     :return:
     """
-    if not isinstance(image_list, list ):
-        raise TypeError(f'Expected list of images as input, but got {type(image_list)}')
+    if not isinstance(image, np.ndarray):
+        raise TypeError(f'Expected list of images as input, but got {type(image)}')
+    np.random.seed(seed)
     theta = np.random.randint(0, 360, 1)[0]
-    out = []
-    for image in image_list:
-        rot_image = ndimage.rotate(image,
-                                   angle=theta,
-                                   reshape='false',
-                                   order=0,
-                                   mode='wrap',
-                                   prefilter=False,
-                                   )
-        # rot_image[rot_image < 0] = 0
-        out.append(rot_image)
-
-    return out
+    rot_image = ndimage.rotate(image,
+                               angle=theta,
+                               reshape='false',
+                               order=0,
+                               mode='wrap',
+                               prefilter=False,
+                               )
+    return rot_image
 
 
 class normalize:
-
     def __init__(self, mean, std):
         self.mean = mean
         self.std = std
 
     def __call__(self, image):
-
         shape = image.shape
         if image.ndim == 4:
             for channel in range(shape[-1]):
-                image[:,:,:,channel] = (image[:,:,:,channel] - self.mean[channel]) / self.std[channel]
+                image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
         if image.ndim == 3:
             for channel in range(shape[-1]):
-                image[:,:,channel] = (image[:,:,channel] - self.mean[channel]) / self.std[channel]
-
+                image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
         return image
 
 class random_crop:
     def __init__(self, dim):
-
         self.dim = dim
 
-    def __call__(self, image_list):
+    @joint_transform
+    def __call__(self, image, seed):
         """
         Expect numpy ndarrays with color in the last channel of the array
         [x,y,z,c] or , [x,y,c]
@@ -191,35 +188,31 @@ class random_crop:
         :param image:
         :return:
         """
-        if not type(image_list) == list:
-            raise ValueError(f'Expected input to be list but got {type(image_list)}')
-        out = []
+        if not isinstance(image, np.ndarray):
+            raise ValueError(f'Expected input to be list but got {type(image)}')
 
-        if image_list[0].ndim == 4:  # 3D image
-            shape = image_list[0].shape
+        np.random.seed(seed)
+
+        if image.ndim == 4:  # 3D image
+            shape = image.shape
             x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
             z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
-        if image_list[0].ndim == 3:  # 3D image
-            shape = image_list[0].shape
+        if image.ndim == 3:  # 3D image
+            shape = image.shape
             x = np.random.randint(0, self.dim[0] - shape[0] + 1, 1)
             y = np.random.randint(0, self.dim[1] - shape[1] + 1, 1)
+        else:
+            raise ValueError(f'Expected np.ndarray with 4/5 ndims but found {image.ndim}')
 
+        if not np.all(image.shape[0:-1:1] >= np.array(self.dim)):
+            raise IndexError(f'Output dimmensions: {self.dim} are larger than input image: {shape}')
 
-        for image in image_list:
-            shape = image.shape
+        if image.ndim == 4:  # 3D image
+            out = image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, z:z+self.dim[2]-1:1, :]
 
-            if not type(image) == np.ndarray:
-                raise ValueError(f'Expected list to contain np.ndarrays but found {type(image)}')
-
-            if not np.all(image.shape[0:-1:1] >= np.array(self.dim)):
-                raise IndexError(f'Output dimmensions: {self.dim} are larger than input image: {shape}')
-
-            if image.ndim == 4:  # 3D image
-                out.append(image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, z:z+self.dim[2]-1:1, :])
-
-            if image.ndim == 3:  # 3D image
-                out.append(image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, :])
+        if image.ndim == 3:  # 3D image
+            out = image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, :]
 
         return out
 
