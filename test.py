@@ -31,7 +31,7 @@ data = dataloader.stack(path='./Data',
                         out_transforms=[t.to_tensor]
                         )
 
-test = GUnet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d),
+test = GUnet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d),
              in_channels=4,
              out_channels=2,
              feature_sizes=[128,256,512],

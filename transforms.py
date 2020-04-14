@@ -4,6 +4,7 @@ import skimage.exposure as exposure
 import numpy as np
 
 
+# DECORATOR
 def joint_transform(func):
     """
     This wrapper generates a seed value for each transform and passes an image from a list to that function
@@ -56,7 +57,7 @@ def to_float(image, seed=None):
     return out
 
 @joint_transform
-def to_tensor(image):
+def to_tensor(image, seed=None):
     """
     Function which reformats a numpy array of [x,y,z,c] to [1, c, x, y, z]
 
@@ -105,7 +106,6 @@ class random_gamma:
     def __init__(self, gamma_range=(.5, 1.5)):
         self.gamma_range = gamma_range
     def __call__(self, image: np.float):
-        print(image)
         if not image.dtype == 'float':
             raise TypeError(f'Expected image dataype to be float but got {image.dtype}')
 
@@ -192,18 +192,17 @@ class random_crop:
             raise ValueError(f'Expected input to be list but got {type(image)}')
 
         np.random.seed(seed)
-
         if image.ndim == 4:  # 3D image
             shape = image.shape
             x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
             z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
-        if image.ndim == 3:  # 3D image
+        elif image.ndim == 3:  # 3D image
             shape = image.shape
             x = np.random.randint(0, self.dim[0] - shape[0] + 1, 1)
             y = np.random.randint(0, self.dim[1] - shape[1] + 1, 1)
         else:
-            raise ValueError(f'Expected np.ndarray with 4/5 ndims but found {image.ndim}')
+            raise ValueError(f'Expected np.ndarray with 3/4 ndims but found {image.ndim}')
 
         if not np.all(image.shape[0:-1:1] >= np.array(self.dim)):
             raise IndexError(f'Output dimmensions: {self.dim} are larger than input image: {shape}')

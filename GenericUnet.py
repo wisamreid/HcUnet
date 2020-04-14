@@ -5,7 +5,7 @@ import pickle
 from utils import pad_image_with_reflections
 
 class GenericUnet(nn.Module):
-    def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d),
+    def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
                  in_channels=3,
                  out_channels=2,
                  feature_sizes=[32, 64, 128, 256, 512, 1024],
@@ -69,6 +69,8 @@ class GenericUnet(nn.Module):
             'dilation': dilation,
             'groups':groups
                                     }
+
+        self.batch_norm = conv_functions[3]
 
         self.first_down_conv = []
         self.second_down_conv = []
@@ -151,16 +153,16 @@ class GenericUnet(nn.Module):
         # Go down the U: Encoding
         for conv1, conv2 in zip(self.first_down_conv[0:-1:1], self.second_down_conv[0:-1:1]):
             #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(conv1(x))
+            x = F.relu(self.batch_norm(conv1(x)))
             #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(conv2(x))
+            x = F.relu(self.batch_norm(conv2(x)))
             down_step_images.append(x)
             x = self.max_pool(x)
             step_counter += 1
 
         # Bottom of the U.
-        x = F.relu(self.first_down_conv[-1](x))
-        x = F.relu(self.second_down_conv[-1](x))
+        x = F.relu(self.batch_norm(self.first_down_conv[-1](x)))
+        x = F.relu(self.batch_norm(self.second_down_conv[-1](x)))
 
         # Go Up the U: Decoding
         for conv1, conv2, up_conv,  in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv):
@@ -171,9 +173,9 @@ class GenericUnet(nn.Module):
             x = torch.cat((x, self.crop(down_step_images.pop(), x)), dim=1)
 
             #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(conv1(x))
+            x = F.relu(self.batch_norm(conv1(x)))
             #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(conv2(x))
+            x = F.relu(self.batch_norm(conv2(x)))
 
             step_counter += 1
 
