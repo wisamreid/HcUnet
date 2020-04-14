@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pickle
+from utils import pad_image_with_reflections
 
 class GenericUnet(nn.Module):
     def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d),
@@ -209,12 +210,15 @@ class GenericUnet(nn.Module):
         model = {'state_dict': self.state_dict(),
                  'model_specifications': self.model_specification}
 
-        pickle.dump(model, open('model.unet', 'wb'))
+        torch.save(model, 'model.unet')
         return None
 
     def load(self, path):
 
-        model = pickle.load(open(path, 'rb'))
+        if torch.cuda.is_available(): device = 'cuda:0'
+        else: device = 'cpu'
+
+        model = torch.load(path, map_location=device)
         model_specification = model['model_specifications']
 
         self.__init__(
@@ -231,7 +235,36 @@ class GenericUnet(nn.Module):
                  )
 
         self.load_state_dict(model['state_dict'])
+
         self.eval()
         return None
+
+    def evaluate(self, image: torch.Tensor):
+        if not isinstance(image, torch.Tensor):
+            raise ValueError(f'Expected image type of torch.Tensor, not {type(image)}')
+        if image.shape[1] != self.model_specification['in_channels']:
+            raise ImportError(f'Image expected to have {self.model_specification["in_channels"]} not {image.shape[1]}')
+
+        self.eval()
+
+        pad = (50, 50, 8)
+        mask = torch.zeros([image.shape[0],
+                            self.model_specification['out_channels'],
+                            image.shape[2],
+                            image.shape[3],
+                            image.shape[4]])
+
+        skip = 100
+
+        for x in torch.arange(0, image.shape[2]), skip:
+            for y in torch.arange(0, image.shape[3], skip):
+                padded_image = pad_image_with_reflections(image[:,:,x:x+skip, y:y+skip, :], pad)
+                mask = self.forward(image)[:, :,
+                       pad[0] // 2:skip + pad[0] // 2,
+                       pad[1] // 2:skip + pad[1] // 2,
+                       pad[2] // 2: -pad[2] // 2:1]
+
+
+
 
 

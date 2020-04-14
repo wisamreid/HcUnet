@@ -20,7 +20,7 @@ data = dataloader.stack(path='./Data',
                         joint_transforms=[t.to_float,
                                           t.reshape,
                                           #t.random_crop([250, 250, 19]),
-                                          t.random_affine,
+                                          #t.random_affine,
                                           #t.random_rotate,
                                           ],
                         image_transforms=[
@@ -40,11 +40,13 @@ test = GUnet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d),
              max_pool_kernel=(2, 2, 1),
              upsample_stride=(2, 2, 1),
              dilation=1,
-             groups=2).to('cpu')
+             groups=2).to('cpu').type(torch.float)
 
-test = test.type(torch.float)
-
+test.save()
+test.load('model.unet')
 image, mask, pwl = data[0]
+
+test.evaluate(image)
 
 # for i in range(19):
 #
@@ -72,8 +74,3 @@ image, mask, pwl = data[0]
 #
 # io.imsave(filename+'.mask.tif', bw_mask)
 
-
-out = utils.pad_image_with_reflections(image, (30, 30, 6))
-for i in [6]:
-    plt.imshow(out[0,1,:,:,i])
-    plt.show()
