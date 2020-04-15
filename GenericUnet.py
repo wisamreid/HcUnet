@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pickle
-from utils import pad_image_with_reflections
+try:
+    from utils import pad_image_with_reflections
+except ModuleNotFoundError:
+    import HcUnet.utils.pad_image_with_reflections as pad_image_with_reflections
+
+
 
 class GenericUnet(nn.Module):
     def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),

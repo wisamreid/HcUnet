@@ -7,7 +7,7 @@ import loss as loss
 import transforms as t
 import utils
 import matplotlib.pyplot as plt
-import LossMasks
+import mask
 import skimage.io as io
 import os
 import pickle

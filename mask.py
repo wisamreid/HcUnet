@@ -3,6 +3,7 @@ import numpy as np
 import skimage.io as io
 from numba import njit
 import pickle
+import scipy.ndimage.morphology
 
 
 class makePWL:
@@ -83,8 +84,11 @@ class makePWL:
 
 
 class makeMask:
-    def __call__(self, imagepath):
+    def __init__(self, erosion=False):
+        self.erosion = erosion
 
+    def __call__(self, imagepath):
+        # EVERYTHING IS [Z,Y,X,C]
         ogimage = io.imread(imagepath)
 
         image = np.copy(ogimage)
@@ -95,6 +99,17 @@ class makeMask:
         background = np.copy(image[0, 0, 0, :])
 
         image = self.create_mask(image, background)
+
+        if self.erosion:
+            binary_mask = colormask_to_mask(image)
+            erroded_mask = np.zeros(binary_mask.shape)
+            for i in range(binary_mask.shape[0]):
+                erroded_mask[i,:,:] = scipy.ndimage.morphology.binary_erosion(binary_mask[i,:,:])
+                erroded_mask = erroded_mask >= 1
+            print(np.median(image))
+            ogimage[erroded_mask == 0] = background
+            image = np.copy(ogimage)
+            print(np.median(image))
 
         return image
 
@@ -112,6 +127,7 @@ class makeMask:
     @staticmethod
     @njit
     def create_mask(image, background):
+
         for nul in range(1):
             for z in range(image.shape[0] - 1):
                 if z == 0:

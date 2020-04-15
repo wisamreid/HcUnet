@@ -1,5 +1,3 @@
-import transforms
-import numpy as np
 import torch
 
 def pad_image_with_reflections(image, pad_size=(30,30,6)):
