@@ -74,13 +74,19 @@ class GenericUnet(nn.Module):
             'groups':groups
                                     }
 
-        self.batch_norm = conv_functions[3]
+        self.batch_norm = []
+
 
         self.first_down_conv = []
         self.second_down_conv = []
         self.first_up_conv = []
         self.second_up_conv = []
         self.upsample_conv = []
+
+
+        for f in feature_sizes:
+            self.batch_norm.append(conv_functions[3](f))
+
 
         # Assign Functions for first convolution
         self.first_down_conv.append(conv_functions[0](in_channels,
@@ -147,6 +153,7 @@ class GenericUnet(nn.Module):
         self.first_up_conv = nn.ModuleList(self.first_up_conv)
         self.second_up_conv = nn.ModuleList(self.second_up_conv)
         self.upsample_conv = nn.ModuleList(self.upsample_conv)
+        self.batch_norm = nn.ModuleList(self.batch_norm)
 
 
     def forward(self, x):
@@ -155,31 +162,35 @@ class GenericUnet(nn.Module):
         step_counter = 0
 
         # Go down the U: Encoding
-        for conv1, conv2 in zip(self.first_down_conv[0:-1:1], self.second_down_conv[0:-1:1]):
-            #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(self.batch_norm(conv1(x)))
-            #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(self.batch_norm(conv2(x)))
+        for conv1, conv2, batch_norm in zip(self.first_down_conv[0:-1:1], self.second_down_conv[0:-1:1], self.batch_norm[0:-1:1]):
+            # print(f'Step: {step_counter}-1: {x.shape}')
+            x = F.relu(batch_norm(conv1(x)))
+            # print(f'Step: {step_counter}-1: {x.shape}')
+            x = F.relu(batch_norm(conv2(x)))
+            # print(f'Step: {step_counter}-1: {x.shape}')
             down_step_images.append(x)
             x = self.max_pool(x)
             step_counter += 1
 
         # Bottom of the U.
-        x = F.relu(self.batch_norm(self.first_down_conv[-1](x)))
-        x = F.relu(self.batch_norm(self.second_down_conv[-1](x)))
+        x = F.relu(self.batch_norm[-1](self.first_down_conv[-1](x)))
+        x = F.relu(self.batch_norm[-1](self.second_down_conv[-1](x)))
 
         # Go Up the U: Decoding
-        for conv1, conv2, up_conv,  in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv):
-            #print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
+        ind = len(self.batch_norm)-1
+        for conv1, conv2, up_conv in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv ):
+            batch_norm = self.batch_norm[ind]
+            # print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
+            # print(batch_norm)
             x = up_conv(x)
-            #print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
-            #print(x.shape,self.crop(previous_image, x).shape )
+            # print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
             x = torch.cat((x, self.crop(down_step_images.pop(), x)), dim=1)
-
-            #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(self.batch_norm(conv1(x)))
-            #print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(self.batch_norm(conv2(x)))
+            ind += -1
+            batch_norm = self.batch_norm[ind]
+            # print(f'Step: {step_counter}-1: {x.shape}')
+            x = F.relu(batch_norm(conv1(x)))
+            # print(f'Step: {step_counter}-1: {x.shape}')
+            x = F.relu(batch_norm(conv2(x)))
 
             step_counter += 1
 
