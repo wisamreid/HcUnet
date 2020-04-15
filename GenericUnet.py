@@ -4,7 +4,7 @@ import torch.nn.functional as F
 try:
     from utils import pad_image_with_reflections
 except ModuleNotFoundError:
-    import HcUnet.utils.pad_image_with_reflections as pad_image_with_reflections
+    from HcUnet.utils import pad_image_with_reflections
 
 
 
