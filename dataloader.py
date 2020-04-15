@@ -49,7 +49,11 @@ class stack(Dataset):
         mask_path = self.files[item]
 
         image = io.imread(image_data_path)
-        mask = io.imread(mask_path)
+        try:
+            mask = io.imread(mask_path)[:,:,:,0]
+        except IndexError:
+            mask = io.imread(mask_path)
+
         pwl = pickle.load(open(pwl_data_path, 'rb'))
 
         # We have to assume there is always a channel index at the last dim
