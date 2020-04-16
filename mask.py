@@ -166,7 +166,7 @@ def colormask_to_mask(colormask):
                 if np.any(colormask[z,y,x,:] != background):
                     colormask[z,y,x,:] = [1, 1, 1]
 
-    return colormask[:,:,:,0]
+    return (colormask[:,:,:,0]*255).astype(np.uint8)
 
 
 

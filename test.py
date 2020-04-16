@@ -1,5 +1,5 @@
 import torch
-from GenericUnet import GenericUnet as GUnet
+from unet import unet_constructor as GUnet
 import numpy as np
 import torch.nn as nn
 import dataloader
@@ -17,18 +17,17 @@ def get_min(image):
         print(i.min())
     return image
 data = dataloader.stack(path='Data/Originals/C2Mar2',
-                        joint_transforms=[t.to_float,
-                                          t.reshape,
+                        joint_transforms=[t.to_float(),
+                                          t.reshape(),
                                           t.random_crop([400, 400, 19]),
-                                          # t.random_affine,
-                                          # t.random_rotate,
+                                          # t.random_affine(),
+                                          # t.random_rotate(),
                                           ],
                         image_transforms=[
                                           t.random_gamma(gamma_range=(.5, 1.5)),
-                                          t.spekle,
+                                          t.spekle(),
                                           t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5])
                                           ],
-                        out_transforms=[t.to_tensor]
                         )
 
 test = GUnet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d),

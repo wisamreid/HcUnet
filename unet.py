@@ -7,8 +7,7 @@ except ModuleNotFoundError:
     from HcUnet.utils import pad_image_with_reflections
 
 
-
-class GenericUnet(nn.Module):
+class unet_constructor(nn.Module):
     def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
                  in_channels=3,
                  out_channels=2,
@@ -39,7 +38,7 @@ class GenericUnet(nn.Module):
         :param max_pool_kernel: Tuple: Kernel for torch.nn.MaxPool2/3d
         :param feature_sizes: List: List of integers describing the number of feature channels at each step of the U
         """
-        super(GenericUnet, self).__init__()
+        super(unet_constructor, self).__init__()
 
 
         # Convert to dict of parameters

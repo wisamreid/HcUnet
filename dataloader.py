@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
 import pickle
+import transforms as t
 
 
 # Ignore warnings
@@ -14,7 +15,7 @@ warnings.filterwarnings("ignore")
 
 class stack(Dataset):
 
-    def __init__(self, path, image_transforms, joint_transforms, out_transforms):
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=(t.to_tensor())):
         """
         CSV File has a list of locations to other minibatch
 
@@ -71,7 +72,6 @@ class stack(Dataset):
             image = it(image)
         for ot in self.out_transforms:
             image, mask, pwl = ot([image, mask, pwl])
-
 
         return image, mask, pwl
 

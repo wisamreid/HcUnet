@@ -14,14 +14,15 @@ for f in folders:
     filename = os.path.splitext(filename)[0]
     filename = os.path.splitext(filename)[0]
     print(filename)
-    makemask = mask.makeMask(erosion=False)
+    makemask = mask.makeMask(erosion=True)
     makepwl = mask.makePWL()
 
     colormask = makemask(filename + '.labels.tif')
     io.imsave(filename+'.colormask.tif', colormask)
 
-    if not os.path.exists(filename+'.pwl.pkl'):
+    if not os.path.exists(filename+'.pwl.tif'):
         pwl = makepwl(filename+'.colormask.tif')
+        io.imsave(filename+'.pwl.tif', pwl)
         pickle.dump(pwl, open(filename+'.pwl.pkl','wb'))
 
     cm = np.copy(colormask)
