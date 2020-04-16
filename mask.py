@@ -130,8 +130,6 @@ class makeMask:
 
         for nul in range(1):
             for z in range(image.shape[0] - 1):
-                if z == 0:
-                    continue
 
                 for x in range(image.shape[1] - 1):
                     if x == 0:

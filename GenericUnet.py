@@ -81,7 +81,6 @@ class GenericUnet(nn.Module):
                                     in_channels=in_channels,
                                     out_channels=feature_sizes[0],
                                     kernel=kernel,
-                                    max_pool_kernel=max_pool_kernel,
                                     dilation=dilation,
                                     groups=groups,
                                     ))

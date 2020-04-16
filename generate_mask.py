@@ -14,7 +14,7 @@ for f in folders:
     filename = os.path.splitext(filename)[0]
     filename = os.path.splitext(filename)[0]
     print(filename)
-    makemask = mask.makeMask(erosion=True)
+    makemask = mask.makeMask(erosion=False)
     makepwl = mask.makePWL()
 
     colormask = makemask(filename + '.labels.tif')
@@ -26,5 +26,6 @@ for f in folders:
 
     cm = np.copy(colormask)
     bw_mask = mask.colormask_to_mask(cm)
+    print(bw_mask.shape)
 
     io.imsave(filename+'.mask.tif', bw_mask)
