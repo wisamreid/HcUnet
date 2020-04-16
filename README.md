@@ -1,7 +1,7 @@
 # Hair Cell Unet (HcUnet)
-######A library of deep learning functions for analysis of confocal z-stacks of mouse cochlear hair cells written in pytorch.
+###### A library of deep learning functions for analysis of confocal z-stacks of mouse cochlear hair cells written in pytorch.
 
-###Quickstart Guide
+### Quickstart Guide
 Bare minimum code requirement for evaluation of an image. 
 ```python
 from unet import unet_constructor as Unet
