@@ -36,7 +36,7 @@ out = model.forward(image.float())
 
 
 
-## unet.py
+## **unet.py**
 
 ### _class_ **unet_constructor**
 ```python
@@ -52,7 +52,7 @@ model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPo
                          groups=1,
                         )
 ```
-#### _fun_ forward
+#### _fun_ **forward**
 ```python
 model.forward(image: torch.Tensor(dtype=torch.float))
 ```
@@ -72,7 +72,7 @@ model.forward(image: torch.Tensor(dtype=torch.float))
 
 In all cases X*, Y*, and Z* will be less than X, Y, and Z due to only valid convolutions being used in the forward pass. The output mask will contain gradients unless model.eval() is called first. 
 
-#### _fun_ save
+#### _fun_ **save**
 ```python
 model.save(filename: str)
 ```
@@ -80,7 +80,7 @@ model.save(filename: str)
 
 This function serializes the state of the model as well as initialization parameters. The save model can be loaded with model.load(filename)
 
-#### _fun_ load
+#### _fun_ **load**
 ```python
 model.load(filename: str, to_cuda=True)
 ```
