@@ -19,9 +19,9 @@ def get_min(image):
 data = dataloader.stack(path='Data/Originals/C2Mar2',
                         joint_transforms=[t.to_float,
                                           t.reshape,
-                                          t.random_crop([250, 250, 19]),
-                                          t.random_affine,
-                                          t.random_rotate,
+                                          t.random_crop([400, 400, 19]),
+                                          # t.random_affine,
+                                          # t.random_rotate,
                                           ],
                         image_transforms=[
                                           t.random_gamma(gamma_range=(.5, 1.5)),
@@ -33,21 +33,21 @@ data = dataloader.stack(path='Data/Originals/C2Mar2',
 
 test = GUnet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d),
              in_channels=4,
-             out_channels=2,
-             feature_sizes=[8,16,32],
+             out_channels=1,
+             feature_sizes=[8,16,32,64,128],
              kernel={'conv1': (3, 3, 2), 'conv2': (3, 3, 1)},
-             upsample_kernel=(3, 3, 2),
+             upsample_kernel=(2, 2, 2),
              max_pool_kernel=(2, 2, 1),
              upsample_stride=(2, 2, 1),
              dilation=1,
-             groups=2).to('cpu').type(torch.float)
+             groups=1).to('cpu')
 
 
-test.save()
-test.load('model.unet')
+# test.save()
+# test.load('model.unet')
 image, mask, pwl = data[0]
 
-test.forward(image.float())
+out = test.forward(image.float())
 #test.evaluate(image)
 
 # for i in range(19):

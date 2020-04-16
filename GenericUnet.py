@@ -53,14 +53,14 @@ class GenericUnet(nn.Module):
         if type(groups) is int or type(groups) is tuple:
             groups = {'conv1': groups, 'conv2': groups}
 
-
+        # Error Checking
         if len(feature_sizes) < 2:
             raise ValueError(f'The Number of Features must be at least 2, not {len(feature_sizes)}')
-
         for i, f in enumerate(feature_sizes[0:-1:1]):
             assert f*2 == feature_sizes[i+1], \
                 f'Feature Sizes must be multiples of two from each other: {f} != {feature_sizes[i-1]}*2'
 
+        # Create Dict for saving model
         self.model_specification = {
             'conv_functions': conv_functions,
             'in_channels': in_channels,
@@ -74,166 +74,79 @@ class GenericUnet(nn.Module):
             'groups':groups
                                     }
 
-        self.batch_norm = []
+        self.down_steps = []
+        self.up_steps = []
 
+        self.down_steps.append(Down(conv_functions,
+                                    in_channels=in_channels,
+                                    out_channels=feature_sizes[0],
+                                    kernel=kernel,
+                                    max_pool_kernel=max_pool_kernel,
+                                    dilation=dilation,
+                                    groups=groups,
+                                    ))
 
-        self.first_down_conv = []
-        self.second_down_conv = []
-        self.first_up_conv = []
-        self.second_up_conv = []
-        self.upsample_conv = []
+        i = 1
+        for f in feature_sizes[1::]:
+            self.down_steps.append(Down(conv_functions,
+                                        in_channels=feature_sizes[i-1],
+                                        out_channels=f,
+                                        kernel=kernel,
+                                        dilation=dilation,
+                                        groups=groups,
+                                        ))
+            i += 1
+        i = -2
+        for f in feature_sizes[:0:-1]:
+            self.up_steps.append(Up(conv_functions,
+                                    in_channels=f,
+                                    out_channels=feature_sizes[i],
+                                    kernel=kernel,
+                                    upsample_kernel=upsample_kernel,
+                                    upsample_stride=upsample_stride,
+                                    dilation=dilation,
+                                    groups=groups,
+                                    ))
+            i += -1
 
-
-        for f in feature_sizes:
-            self.batch_norm.append(conv_functions[3](f))
-
-
-        # Assign Functions for first convolution
-        self.first_down_conv.append(conv_functions[0](in_channels,
-                                                      feature_sizes[0],
-                                                      kernel['conv1'],
-                                                      dilation=dilation['conv1'],
-                                                      groups=groups['conv1'],
-                                                      padding=0))
-
-        self.second_down_conv.append(conv_functions[0](feature_sizes[0],
-                                                       feature_sizes[0],
-                                                       kernel['conv2'],
-                                                       dilation=dilation['conv2'],
-                                                       groups=groups['conv2'],
-                                                       padding=0))
-
-        # Down Steps
-        for i in range(1, len(feature_sizes), 1):
-
-            self.first_down_conv.append(conv_functions[0](feature_sizes[i-1],
-                                                          feature_sizes[i],
-                                                          kernel['conv1'],
-                                                          dilation=dilation['conv1'],
-                                                          groups=groups['conv1'],
-                                                          padding=0))
-
-            self.second_down_conv.append(conv_functions[0](feature_sizes[i],
-                                                           feature_sizes[i],
-                                                           kernel['conv2'],
-                                                           dilation=dilation['conv2'],
-                                                           groups=groups['conv2'],
-                                                           padding=0))
-
-        # Up Steps
-        for i in range(len(feature_sizes) - 2, -1, -1):
-            self.first_up_conv.append(conv_functions[0](feature_sizes[i+1],
-                                                        feature_sizes[i],
-                                                        kernel['conv1'],
-                                                        dilation=dilation['conv1'],
-                                                        groups=groups['conv1'],
-                                                        padding=0))
-
-            self.second_up_conv.append(conv_functions[0](feature_sizes[i],
-                                                         feature_sizes[i],
-                                                         kernel['conv2'],
-                                                         dilation=dilation['conv2'],
-                                                         groups=groups['conv2'],
-                                                         padding=0))
-
-        # Up-Convs
-        for i in range(len(feature_sizes)-1, -1, -1): # Range Ignores weird stuff.
-            self.upsample_conv.append(conv_functions[1](feature_sizes[i],
-                                                        feature_sizes[i-1],
-                                                        upsample_kernel,
-                                                        stride=upsample_stride,
-                                                        padding=0))
-
+        self.out_conv = conv_functions[0](feature_sizes[0], out_channels, 1)
+        self.down_steps = nn.ModuleList(self.down_steps)
+        self.up_steps = nn.ModuleList(self.up_steps)
         self.max_pool = conv_functions[2](max_pool_kernel)
-        self.segmentation_conv = conv_functions[0](feature_sizes[0], out_channels, 1, padding=0)
-
-        # Have to make it a module list for model.to('cuda:0') to work
-        self.first_down_conv = nn.ModuleList(self.first_down_conv)
-        self.second_down_conv = nn.ModuleList(self.second_down_conv)
-        self.first_up_conv = nn.ModuleList(self.first_up_conv)
-        self.second_up_conv = nn.ModuleList(self.second_up_conv)
-        self.upsample_conv = nn.ModuleList(self.upsample_conv)
-        self.batch_norm = nn.ModuleList(self.batch_norm)
-
 
     def forward(self, x):
+        outputs = []
 
-        down_step_images = []
-        step_counter = 0
-
-        # Go down the U: Encoding
-        for conv1, conv2, batch_norm in zip(self.first_down_conv[0:-1:1], self.second_down_conv[0:-1:1], self.batch_norm[0:-1:1]):
-            # print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(batch_norm(conv1(x)))
-            # print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(batch_norm(conv2(x)))
-            # print(f'Step: {step_counter}-1: {x.shape}')
-            down_step_images.append(x)
+        for step in self.down_steps[:-1]:
+            x = step(x)
+            outputs.append(x)
             x = self.max_pool(x)
-            step_counter += 1
 
-        # Bottom of the U.
-        x = F.relu(self.batch_norm[-1](self.first_down_conv[-1](x)))
-        x = F.relu(self.batch_norm[-1](self.second_down_conv[-1](x)))
+        x = self.down_steps[-1](x)
 
-        # Go Up the U: Decoding
-        ind = len(self.batch_norm)-1
-        for conv1, conv2, up_conv in zip(self.first_up_conv, self.second_up_conv, self.upsample_conv ):
-            batch_norm = self.batch_norm[ind]
-            # print(f'Step: {step_counter}-upconv: {up_conv(x).shape}')
-            # print(batch_norm)
-            x = up_conv(x)
-            # print(f'Step: {step_counter}-cat: {x.shape} -> {down_step_images[-1].shape}')
-            x = torch.cat((x, self.crop(down_step_images.pop(), x)), dim=1)
-            ind += -1
-            batch_norm = self.batch_norm[ind]
-            # print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(batch_norm(conv1(x)))
-            # print(f'Step: {step_counter}-1: {x.shape}')
-            x = F.relu(batch_norm(conv2(x)))
+        for step in self.up_steps:
+            x = step(x, outputs.pop())
 
-            step_counter += 1
+        x = self.out_conv(x)
 
-        x = self.segmentation_conv(x)
+        outputs = None  # Do this to clear memory
 
         return x
 
-    @staticmethod
-    @torch.jit.script
-    def crop(x, y):
-        """
-        Cropping Function to crop tensors to each other. By default only crops last 2 (in 2d) or 3 (in 3d) dimensions of
-        a tensor.
 
-        :param x: Tensor to be cropped
-        :param y: Tensor by who's dimmension will crop x
-        :return:
-        """
-        shape_x = x.shape
-        shape_y = y.shape
-        cropped_tensor = torch.empty(0)
-
-        assert shape_x[1] == shape_y[1], f'Inputs do not have same number of feature dimmensions: {shape_x} | {shape_y}'
-
-        if len(shape_x) == 4:
-            cropped_tensor = x[:, :, 0:shape_y[2]:1, 0:shape_y[3]:1]
-        if len(shape_x) == 5:
-            cropped_tensor = x[:, :, 0:shape_y[2]:1, 0:shape_y[3]:1, 0:shape_y[4]:1]
-
-        return cropped_tensor
 
     def save(self):
-
         model = {'state_dict': self.state_dict(),
                  'model_specifications': self.model_specification}
-
         torch.save(model, 'model.unet')
         return None
 
     def load(self, path):
 
-        if torch.cuda.is_available(): device = 'cuda:0'
-        else: device = 'cpu'
+        if torch.cuda.is_available():
+            device = 'cuda:0'
+        else:
+            device = 'cpu'
 
         model = torch.load(path, map_location=device)
         model_specification = model['model_specifications']
@@ -292,6 +205,105 @@ class GenericUnet(nn.Module):
                                                          pad[2] // 2: image.shape[3]:1]
 
 
+
+class Down(nn.Module):
+    def __init__(self, conv_functions: tuple,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel: dict,
+                 dilation: dict,
+                 groups: dict,
+                 ):
+        super(Down, self).__init__()
+
+        self.conv1 = conv_functions[0](in_channels,
+                                       out_channels,
+                                       kernel['conv1'],
+                                       dilation=dilation['conv1'],
+                                       groups=groups['conv1'],
+                                       padding=0)
+        self.conv2 = conv_functions[0](out_channels,
+                                       out_channels,
+                                       kernel['conv2'],
+                                       dilation=dilation['conv2'],
+                                       groups=groups['conv2'],
+                                       padding=0)
+
+        self.batch1 = conv_functions[3](out_channels)
+        self.batch2 = conv_functions[3](out_channels)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.relu(self.batch1(self.conv1(x)))
+        x = self.relu(self.batch2(self.conv2(x)))
+        return x
+
+class Up(nn.Module):
+    def __init__(self, conv_functions: tuple,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel: tuple,
+                 upsample_kernel: tuple,
+                 upsample_stride: int,
+                 dilation: dict,
+                 groups: dict,
+                 ):
+        super(Up, self).__init__()
+        self.conv1 = conv_functions[0](in_channels,
+                                       out_channels,
+                                       kernel['conv1'],
+                                       dilation=dilation['conv1'],
+                                       groups=groups['conv1'],
+                                       padding=0)
+        self.conv2 = conv_functions[0](out_channels,
+                                       out_channels,
+                                       kernel['conv2'],
+                                       dilation=dilation['conv2'],
+                                       groups=groups['conv2'],
+                                       padding=0)
+
+        self.up_conv = conv_functions[1](in_channels,
+                                         out_channels,
+                                         upsample_kernel,
+                                         stride=upsample_stride,
+                                         padding=0)
+
+        self.batch1 = conv_functions[3](out_channels)
+        self.batch2 = conv_functions[3](out_channels)
+        self.relu = nn.ReLU()
+
+    def forward(self, x, y):
+        x = self.up_conv(x)
+        y = crop(x, y)
+        x = torch.cat((x, y), dim=1)
+        x = self.relu(self.batch1(self.conv1(x)))
+        x = self.relu(self.batch2(self.conv2(x)))
+        return x
+
+
+@torch.jit.script
+def crop(x, y):
+    """
+    Cropping Function to crop tensors to each other. By default only crops last 2 (in 2d) or 3 (in 3d) dimensions of
+    a tensor.
+
+    :param x: Tensor to be cropped
+    :param y: Tensor by who's dimmension will crop x
+    :return:
+    """
+    shape_x = x.shape
+    shape_y = y.shape
+    cropped_tensor = torch.empty(0)
+
+    assert shape_x[1] == shape_y[1],\
+        f'Inputs do not have same number of feature dimmensions: {shape_x} | {shape_y}'
+
+    if len(shape_x) == 4:
+        cropped_tensor = x[:, :, 0:shape_y[2]:1, 0:shape_y[3]:1]
+    if len(shape_x) == 5:
+        cropped_tensor = x[:, :, 0:shape_y[2]:1, 0:shape_y[3]:1, 0:shape_y[4]:1]
+
+    return cropped_tensor
 
 
 
