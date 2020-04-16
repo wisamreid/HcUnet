@@ -47,11 +47,21 @@ model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPo
                          kernel=(3, 3),
                          upsample_kernel=(2, 2),
                          max_pool_kernel=(2, 2),
-                         upsample_stride=2,
+                         upsample_stride=(2, 2),
                          dilation=1,
                          groups=1,
                         )
 ```
+con_functions: A length 4 tuple of torch.nn functions in order of (nn.Conv(2/3)d, nn.ConvTranspose(2/3)d, nn.MaxPool(2/3)d, nn.BatchNorm(2/3)d) where each function is its 2d or 3d equivalent.
+in_channels: Number of color channels the input image has 
+out_channels: Number of output features (including background)
+feature_sizes: list of integers representing the feature sizes at each step of the Unet. Each feature size must be twice the size of the previous. 
+kernel: tuple of size 2 (or 3 for 3d) representing the kernel sizes of the convolution operations of Unet
+upsample_kernel: tuple of size 2 (or 3 for 3d) representing the kernel sizes of the transpose convolutions for unet.
+max_pool_kernel: tuple of size 2 (or 3 for 3d) representing the kernel sizes of the maximum pooling operations of Unet
+upsample_stride: tuple of size 2 (or 3 for 3d) representing the stride of the transpose convolutions for unet. If an int is passed, it is automatically inferred that the stride is identical for all cardinal directions. i.e. upsample_stride=2 is the same as upample_stride=(2,2)
+dilation: dialation of the transpose convolution kernels
+groups: Number of groups of filters to be learned. Must be divisible by the number of input channels
 #### _fun_ **forward**
 ```python
 model.forward(image: torch.Tensor(dtype=torch.float))
