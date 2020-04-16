@@ -46,7 +46,7 @@ class stack(Dataset):
         file_with_mask = os.path.splitext(self.files[item])[0]
 
         image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
-        pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.pkl'
+        pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
         mask_path = self.files[item]
 
         image = io.imread(image_data_path)
@@ -55,7 +55,7 @@ class stack(Dataset):
         except IndexError:
             mask = io.imread(mask_path)
 
-        pwl = pickle.load(open(pwl_data_path, 'rb'))
+        pwl = io.imread(pwl_data_path)
 
         # We have to assume there is always a channel index at the last dim
         # So for 3D its [Z,Y,X,C]
