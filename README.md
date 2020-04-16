@@ -38,19 +38,37 @@ out = model.forward(image.float())
 
 ## unet.py
 #### Deep Learning Model Defininitions
-_class_ **unet.unet_constructor**
+_class_ **unet_constructor**
 ```python
-unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
-                 in_channels=3,
-                 out_channels=2,
-                 feature_sizes=[32, 64, 128, 256, 512, 1024],
-                 kernel=(3, 3),
-                 upsample_kernel=(2, 2),
-                 max_pool_kernel=(2, 2),
-                 upsample_stride=2,
-                 dilation=1,
-                 groups=1,
-                 )
-
+model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
+                         in_channels=3,
+                         out_channels=2,
+                         feature_sizes=[32, 64, 128, 256, 512, 1024],
+                         kernel=(3, 3),
+                         upsample_kernel=(2, 2),
+                         max_pool_kernel=(2, 2),
+                         upsample_stride=2,
+                         dilation=1,
+                         groups=1,
+                        )
 ```
+##### _fun_ forward
+```python
+model.forward(image: torch.Tensor(dtype=torch.float))
+```
+*image*: torch.Tensor of type _float_ with shape [B, C, X, Y, Z] 
+* B: Batch Size
+* C: Number of Channels as defined by variable _in_channels_
+* X: Size of image in x dimension
+* Y: Size of image in y dimension
+* Z: Size of image in z dimension
+
+*returns*: ouput mask of torch.Tensor of type _float_ with shape [B, M, X*, Y*, Z*]
+* B: Batch Size
+* M: Number of mask Channels as defined by variable _out_channels_
+* X*: Size of mask in x dimension
+* Y*: Size of mask in y dimension
+* Z*: Size of mask in z dimension
+
+In all cases X*, Y*, and Z* will be less than X, Y, and Z due to only valid convolutions being used in the forward pass.
 
