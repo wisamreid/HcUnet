@@ -66,14 +66,14 @@ model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPo
 ```python
 model.forward(image: torch.Tensor(dtype=torch.float))
 ```
-*image*: torch.Tensor of type _float_ with shape [B, C, X, Y, Z] 
+**image**: torch.Tensor of type _float_ with shape [B, C, X, Y, Z] 
 * B: Batch Size
 * C: Number of Channels as defined by variable _in_channels_
 * X: Size of image in x dimension
 * Y: Size of image in y dimension
 * Z: Size of image in z dimension
 
-*returns*: ouput mask of torch.Tensor of type _float_ with shape [B, M, X*, Y*, Z*]
+**returns**: ouput mask of torch.Tensor of type _float_ with shape [B, M, X*, Y*, Z*]
 * B: Batch Size
 * M: Number of mask Channels as defined by variable _out_channels_
 * X*: Size of mask in x dimension
@@ -86,13 +86,15 @@ In all cases X*, Y*, and Z* will be less than X, Y, and Z due to only valid conv
 ```python
 model.save(filename: str)
 ```
-*filename*: filename by which to serialize model state to
+* **filename**: filename by which to serialize model state to
 
 This function serializes the state of the model as well as initialization parameters. The save model can be loaded with model.load(filename)
+* **returns** None
 
 #### _fun_ **load**
 ```python
 model.load(filename: str, to_cuda=True)
 ```
-*filename* Filename which to load model from. 
-*to_cuda* If true attemts to load the model state to cuda. If cuda is not available will throw a warning and initalize on the cpu instead. 
+* **filename** Filename which to load model from. 
+* **to_cuda** If true attemts to load the model state to cuda. If cuda is not available will throw a warning and initalize on the cpu instead. 
+* **returns** None
