@@ -133,20 +133,21 @@ class unet_constructor(nn.Module):
 
 
 
-    def save(self):
+    def save(self, filename):
         model = {'state_dict': self.state_dict(),
                  'model_specifications': self.model_specification}
-        torch.save(model, 'model.unet')
+        torch.save(model, filename)
         return None
 
-    def load(self, path):
+    def load(self, filename, to_cuda=True):
 
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and to_cuda:
             device = 'cuda:0'
         else:
+            Warning('Cuda is not available, initalizing mdoel on the CPU')
             device = 'cpu'
 
-        model = torch.load(path, map_location=device)
+        model = torch.load(filename, map_location=device)
         model_specification = model['model_specifications']
 
         self.__init__(

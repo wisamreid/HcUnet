@@ -37,8 +37,8 @@ out = model.forward(image.float())
 
 
 ## unet.py
-#### Deep Learning Model Defininitions
-_class_ **unet_constructor**
+
+###_class_ **unet_constructor**
 ```python
 model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
                          in_channels=3,
@@ -52,7 +52,7 @@ model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPo
                          groups=1,
                         )
 ```
-##### _fun_ forward
+#### _fun_ forward
 ```python
 model.forward(image: torch.Tensor(dtype=torch.float))
 ```
@@ -70,5 +70,19 @@ model.forward(image: torch.Tensor(dtype=torch.float))
 * Y*: Size of mask in y dimension
 * Z*: Size of mask in z dimension
 
-In all cases X*, Y*, and Z* will be less than X, Y, and Z due to only valid convolutions being used in the forward pass.
+In all cases X*, Y*, and Z* will be less than X, Y, and Z due to only valid convolutions being used in the forward pass. The output mask will contain gradients unless model.eval() is called first. 
 
+#### _fun_ save
+```python
+model.save(filename: str)
+```
+*filename*: filename by which to serialize model state to
+
+This function serializes the state of the model as well as initialization parameters. The save model can be loaded with model.load(filename)
+
+#### _fun_ load
+```python
+model.load(filename: str, to_cuda=True)
+```
+*filename* Filename which to load model from. 
+*to_cuda* If true attemts to load the model state to cuda. If cuda is not available will throw a warning and initalize on the cpu instead. 
