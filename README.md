@@ -38,7 +38,7 @@ out = model.forward(image.float())
 
 ## unet.py
 
-###_class_ **unet_constructor**
+### _class_ **unet_constructor**
 ```python
 model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
                          in_channels=3,
