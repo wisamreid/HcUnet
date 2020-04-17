@@ -5,7 +5,10 @@ from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
 import pickle
-import transforms as t
+try:
+    import transforms as t
+except ModuleNotFoundError:
+    import HcUnet.transforms as t
 
 
 # Ignore warnings
