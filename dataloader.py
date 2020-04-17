@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 class stack(Dataset):
 
-    def __init__(self, path, image_transforms, joint_transforms, out_transforms=(t.to_tensor())):
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=[t.to_tensor()]):
         """
         CSV File has a list of locations to other minibatch
 

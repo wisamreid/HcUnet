@@ -18,9 +18,16 @@ def joint_transform(func):
                                # We only want to take the last argument, which should always be the image list
         if not type(image_list) == list:
             image_list = [image_list]
+
+        if len(image_list)>1:
+            for i in range(len(image_list)-1):
+                if not image_list[i].ndim == image_list[i+1].ndim:
+                  raise ValueError('Images in joint transforms do not contain identical dimensions.'
+                                   + f'Im {i}.ndim:{image_list[i].ndim} != Im {i+1}.ndim:{image_list[i+1].ndim} ')
         out = []
         seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
+            print(f'DIMshape {im.shape}')
             if len(args) > 1:
                 out.append(func(args[0], image=im, seed=seed))
             else:
