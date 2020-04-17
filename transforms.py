@@ -13,17 +13,18 @@ def joint_transform(func):
     :param func: Function with arguments 'image' and 'seed'
     :return: Wrapped function that can now accept lists
     """
+
     def wrapper(*args):
         image_list = args[-1]  # In the case of a class function, there may be two args, one is 'self'
-                               # We only want to take the last argument, which should always be the image list
+        # We only want to take the last argument, which should always be the image list
         if not type(image_list) == list:
             image_list = [image_list]
 
-        if len(image_list)>1:
-            for i in range(len(image_list)-1):
-                if not image_list[i].ndim == image_list[i+1].ndim:
-                  raise ValueError('Images in joint transforms do not contain identical dimensions.'
-                                   + f'Im {i}.ndim:{image_list[i].ndim} != Im {i+1}.ndim:{image_list[i+1].ndim} ')
+        if len(image_list) > 1:
+            for i in range(len(image_list) - 1):
+                if not image_list[i].ndim == image_list[i + 1].ndim:
+                    raise ValueError('Images in joint transforms do not contain identical dimensions.'
+                                     + f'Im {i}.ndim:{image_list[i].ndim} != Im {i + 1}.ndim:{image_list[i + 1].ndim} ')
         out = []
         seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
@@ -35,6 +36,7 @@ def joint_transform(func):
         if len(out) == 1:
             out = out[0]
         return out
+
     return wrapper
 
 
@@ -45,7 +47,7 @@ class int16_to_float:
     def __call__(self, image: np.int16):
         if not image.dtype == 'uint16':
             raise TypeError(f'Expected image datatype to be uint16 but got {image.dtype}')
-        return (image/2**16).astype(np.float)
+        return (image / 2 ** 16).astype(np.float)
 
 
 class int8_to_float:
@@ -55,7 +57,7 @@ class int8_to_float:
     def __call__(self, image: np.int) -> np.ndarray:
         if not image.dtype == 'uint8':
             raise TypeError(f'Expected image datatype to be uint8 but got {image.dtype}')
-        return(image/255).astype(np.float)
+        return (image / 255).astype(np.float)
 
 
 class to_float:
@@ -65,7 +67,7 @@ class to_float:
     @joint_transform
     def __call__(self, image, seed=None):
         if image.dtype == 'uint16':
-            out = (image/2**16).astype(np.float)
+            out = (image / 2 ** 16).astype(np.float)
         elif image.dtype == 'uint8':
             out = (image / 255).astype(np.float)
         elif image.dtype == 'float':
@@ -73,6 +75,7 @@ class to_float:
         else:
             raise TypeError(f'Expected image datatype of uint8 or uint16 but got {image.dtype}')
         return out
+
 
 class to_tensor:
     def __init__(self):
@@ -94,6 +97,7 @@ class to_tensor:
         # [x,y,z,c] -> [1,x,y,z,c] -> [c,x,y,z,1] -> [c,x,y,z] -> [1,c,x,y,z]
         return image.unsqueeze(0).transpose(num_dims, 0).squeeze(dim=image.dim()).unsqueeze(0)
 
+
 class reshape:
     def __init__(self):
         pass
@@ -111,7 +115,7 @@ class reshape:
         """
         if not isinstance(image, np.ndarray):
             raise TypeError(f'Expected input type of np.ndarray but got {type(image)}')
-        return image.swapaxes(len(image.shape)-2, 0)
+        return image.swapaxes(len(image.shape) - 2, 0)
 
 
 class spekle:
@@ -126,13 +130,14 @@ class spekle:
             raise ValueError(f'Maximum spekle gamma should be less than 1 [ gamma =/= {self.gamma} ]')
 
         image_shape = np.shape(image)
-        noise = np.random.normal(0,self.gamma, image_shape)
+        noise = np.random.normal(0, self.gamma, image_shape)
         noise = np.float32(noise)
-        image = image+noise
-        image[image<0] = 0
-        image[image>1] = 1
+        image = image + noise
+        image[image < 0] = 0
+        image[image > 1] = 1
 
         return image
+
 
 class random_gamma:
     def __init__(self, gamma_range=(.8, 1.2)):
@@ -174,6 +179,7 @@ class random_affine:
 
         return ndimage.affine_transform(image, mat, order=0, output_shape=image.shape, mode='reflect')
 
+
 class random_rotate:
     def __init__(self, angle=None):
         self.angle = angle
@@ -199,7 +205,6 @@ class random_rotate:
         return ndimage.rotate(image, angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
 
 
-
 class normalize:
     def __init__(self, mean=[.5, .5, .5, .5], std=[.5, .5, .5, .5]):
         self.mean = mean
@@ -214,6 +219,7 @@ class normalize:
             for channel in range(shape[-1]):
                 image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
         return image
+
 
 class random_crop:
     def __init__(self, dim):
@@ -248,23 +254,9 @@ class random_crop:
             raise IndexError(f'Output dimmensions: {self.dim} are larger than input image: {shape}')
 
         if image.ndim == 4:  # 3D image
-            out = image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, z:z+self.dim[2]-1:1, :]
+            out = image[x:x + self.dim[0] - 1:1, y:y + self.dim[1] - 1:1, z:z + self.dim[2] - 1:1, :]
 
         if image.ndim == 3:  # 3D image
-            out = image[x:x+self.dim[0]-1:1, y:y+self.dim[1]-1:1, :]
+            out = image[x:x + self.dim[0] - 1:1, y:y + self.dim[1] - 1:1, :]
 
         return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
