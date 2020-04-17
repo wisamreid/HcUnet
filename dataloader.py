@@ -4,7 +4,6 @@ from skimage import io
 from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
-import pickle
 try:
     import transforms as t
 except ModuleNotFoundError:
@@ -35,10 +34,7 @@ class stack(Dataset):
         if len(self.files) == 0:
             raise FileExistsError('No Valid Mask Files Found')
 
-
-
     def __len__(self):
-
         return len(self.files)
 
     def __getitem__(self, item):

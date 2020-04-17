@@ -8,7 +8,8 @@ except ModuleNotFoundError:
 
 
 class unet_constructor(nn.Module):
-    def __init__(self, conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
+    def __init__(self,
+                 image_dimmensions=2,
                  in_channels=3,
                  out_channels=2,
                  feature_sizes=[32, 64, 128, 256, 512, 1024],
@@ -39,7 +40,12 @@ class unet_constructor(nn.Module):
         :param feature_sizes: List: List of integers describing the number of feature channels at each step of the U
         """
         super(unet_constructor, self).__init__()
-
+        if image_dimmensions == 2:
+            conv_functions = (nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm2d)
+        elif image_dimmensions == 3:
+            conv_functions = (nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d)
+        else:
+            raise ValueError(f'Does not support {image_dimmensions} dimensional images')
 
         # Convert to dict of parameters
         #  In order to allow for multiple values passed to the first and second step of each convolution,
@@ -204,7 +210,6 @@ class unet_constructor(nn.Module):
                                                          pad[2] // 2: image.shape[3]:1]
 
 
-
 class Down(nn.Module):
     def __init__(self, conv_functions: tuple,
                  in_channels: int,
@@ -236,6 +241,7 @@ class Down(nn.Module):
         x = self.relu(self.batch1(self.conv1(x)))
         x = self.relu(self.batch2(self.conv2(x)))
         return x
+
 
 class Up(nn.Module):
     def __init__(self, conv_functions: tuple,

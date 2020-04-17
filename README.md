@@ -15,7 +15,7 @@ data = dataloader.stack(path='./Data',
                         image_transforms=[t.normalize()],
                         )
 
-model = Unet(conv_functions=(nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d),
+model = Unet(image_dimmensions=2
              in_channels=4,
              out_channels=1,
              feature_sizes=[8,16,32,64,128],
@@ -52,7 +52,7 @@ model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPo
                          groups=1,
                         )
 ```
-* **con_functions:** A length 4 tuple of torch.nn functions in order of (nn.Conv(2/3)d, nn.ConvTranspose(2/3)d, nn.MaxPool(2/3)d, nn.BatchNorm(2/3)d) where each function is its 2d or 3d equivalent.
+* **image_dimmensions:** Number of image dimmensions your images have. Only supports 2d or 3d images. 
 * **in_channels:** Number of color channels the input image has 
 * **out_channels:** Number of output features (including background)
 * **feature_sizes:** list of integers representing the feature sizes at each step of the Unet. Each feature size must be twice the size of the previous. 
@@ -98,3 +98,39 @@ model.load(filename: str, to_cuda=True)
 * **filename** Filename which to load model from. 
 * **to_cuda** If true attemts to load the model state to cuda. If cuda is not available will throw a warning and initalize on the cpu instead. 
 * **returns** None
+
+## **dataloader.py**
+
+### _class_ **stack**
+
+```python
+import dataloader
+import transforms
+data = dataloader.stack(path:str
+                        joint_transforms:list
+                       	image_transforms:list
+                        out_transforms = [transforms.to_tensor()]
+                       )
+```
+
+
+
+* **path** A string containing the location of your data
+* **joint_transforms** A list of transforms to be applied to the images, masks, and pixel weighting images
+* **image_transforms** A list of transforms to be applied to only the image
+* **out_transforms** An optional list of transforms to be applied to all files after the application of functions contained in joint_transforms and image_transforms. Defaults to a list containing a single transform: transforms.to_tensor(). 
+
+The class: dataloader.stack is a convenient way to easily load data from a file and apply data augmentation transforms for training the deep learning model. By default it looks for groups of similarly named **16bit or float** tif files with different exensions holding data for your original image, mask, and pixel-wise-weight for loss (pwl) adjustment (as described in the original Unet paper for forcing the network to learn borders between cells). The exensions must be:
+
+	* *.tif
+	* *.mask.tif
+	* *.pwl.tif
+
+For example, the dataloader will group three files with the names: data.tif (z-stack image), data.mask.tif (manually segmented mask for data.tif) and data.pwl.tif (computed pixel-wise weight augmenting the loss function). When placed in the same folder described by the input variable **path**, these images can then be indexed in a similar fasion to indexing an array. 
+
+```python
+image, mask, pwl = data[0]
+```
+
+The image, mask and pwl will first be augmented by transforms passed via the **joint_transforms** argument. Next the image will be augmented by transforms passed via the **image_transforms** argument. Then, image, mask, pwl will finnally be augmented by tranforms passed via the **out_transforms** argument. 
+
