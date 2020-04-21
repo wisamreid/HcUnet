@@ -28,7 +28,6 @@ def joint_transform(func):
         out = []
         seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
-            print(f'DIMshape {im.shape}')
             if len(args) > 1:
                 out.append(func(args[0], image=im, seed=seed))
             else:

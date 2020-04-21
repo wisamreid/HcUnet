@@ -134,3 +134,29 @@ image, mask, pwl = data[0]
 
 The image, mask and pwl will first be augmented by transforms passed via the **joint_transforms** argument. Next the image will be augmented by transforms passed via the **image_transforms** argument. Then, image, mask, pwl will finnally be augmented by tranforms passed via the **out_transforms** argument. 
 
+## **utils.py**
+
+### _fun_ pad_image_with_reflections
+
+```python
+import utils
+
+out = utils.pad_image_with_reflections(image, pad_size=(30, 30, 6)):
+```
+
+**image**: image of type torch.tensor with shape [B, C, X, Y, Z]
+
+* B: Batch Size (**NOTE**: Currently only works for batch size of 1)
+* C: Number of Channels
+* X: Size of image in x dimension
+* Y: Size of image in y dimension
+* Z: Size of image in z dimension
+
+**pad_size**: tuple of length 3 of the total padding in the three cardinal directions where _pad_size_ = (pad_x, pad_y, pad_z). Padding is applied to all sides of the image. Padding to any one side of the image is effectivly half described in _pad_size_. 
+
+**out**: image of type torch.tensor with shape  [B, C, X+pad_size[0], Y+pad_size[1], Z+pad_size[2]]
+
+This function reflects the sides of an image to apply coninuous padding on all sides of a three dimmensional image as described in the original unet paper. (Image from: https://arxiv.org/pdf/1505.04597.pdf)
+
+![image-20200421155211380](/Users/chrisbuswinka/Library/Application Support/typora-user-images/image-20200421155211380.png)
+

@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 
 class unet_constructor(nn.Module):
     def __init__(self,
-                 image_dimmensions=2,
+                 image_dimensions=2,
                  in_channels=3,
                  out_channels=2,
                  feature_sizes=[32, 64, 128, 256, 512, 1024],
@@ -40,12 +40,12 @@ class unet_constructor(nn.Module):
         :param feature_sizes: List: List of integers describing the number of feature channels at each step of the U
         """
         super(unet_constructor, self).__init__()
-        if image_dimmensions == 2:
+        if image_dimensions == 2:
             conv_functions = (nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm2d)
-        elif image_dimmensions == 3:
+        elif image_dimensions == 3:
             conv_functions = (nn.Conv3d, nn.ConvTranspose3d, nn.MaxPool3d, nn.BatchNorm3d)
         else:
-            raise ValueError(f'Does not support {image_dimmensions} dimensional images')
+            raise ValueError(f'Does not support {image_dimensions} dimensional images')
 
         # Convert to dict of parameters
         #  In order to allow for multiple values passed to the first and second step of each convolution,
@@ -67,7 +67,7 @@ class unet_constructor(nn.Module):
 
         # Create Dict for saving model
         self.model_specification = {
-            'conv_functions': conv_functions,
+            'image_dimensions': image_dimensions,
             'in_channels': in_channels,
             'out_channels': out_channels,
             'feature_sizes': feature_sizes,
@@ -157,7 +157,7 @@ class unet_constructor(nn.Module):
         model_specification = model['model_specifications']
 
         self.__init__(
-                 conv_functions=model_specification['conv_functions'],
+                 image_dimensions=model_specification['image_dimensions'],
                  in_channels=model_specification['in_channels'],
                  out_channels=model_specification['out_channels'],
                  feature_sizes=model_specification['feature_sizes'],

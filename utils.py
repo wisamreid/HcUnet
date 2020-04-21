@@ -1,9 +1,10 @@
 import torch
 
-def pad_image_with_reflections(image, pad_size=(30,30,6)):
+
+def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     """
     Pads image according to Unet spec
-    expect [z,y,x,c]
+    expect [B, C, X, Y, Z]
 
     :param image:
     :param pad_size:
@@ -37,3 +38,26 @@ def pad_image_with_reflections(image, pad_size=(30,30,6)):
     return out
 
 
+def predict_mask(model, image):
+    """
+    Takes in a model and an image and applies the model to all parts of the image.
+
+    ALGORITHM:
+    apply padding ->
+    calculate indexes for unet based on image.shape ->
+    apply Unet on slices of image based on indexes ->
+    take only valid portion of the middle of each output mask ->
+    construct full valid mask ->
+    RETURN mask
+
+    :param model: Trained Unet Model from unet.py
+    :param image: torch.Tensor image with transforms pre applied!!! [1, 4, X, Y, Z]
+    :return mask:
+
+    """
+
+    
+
+
+
+    return None
