@@ -222,7 +222,7 @@ class normalize:
 
 class random_crop:
     def __init__(self, dim):
-        self.dim = dim
+        self.dim = np.array(dim)
 
     @joint_transform
     def __call__(self, image, seed):
@@ -238,9 +238,11 @@ class random_crop:
 
         np.random.seed(seed)
         if image.ndim == 4:  # 3D image
-            shape = image.shape
-
-            shape[shape[0:2] > self.dim] = self.dim[[shape[0:2] > self.dim]]
+            shape = image.shape[0:-1]
+            ind = shape < self.dim
+            for i, val in enumerate(ind):
+                if val:
+                    self.dim[i] = shape[i]
 
             x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
