@@ -152,7 +152,7 @@ out = utils.pad_image_with_reflections(image, pad_size=(30, 30, 6)):
 * Y: Size of image in y dimension
 * Z: Size of image in z dimension
 
-**pad_size**: tuple of length 3 of the total padding in the three cardinal directions where _pad_size_ = (pad_x, pad_y, pad_z). Padding is applied to all sides of the image. Padding to any one side of the image is effectivly half described in _pad_size_. 
+**pad_size**: tuple of length 3 of the total padding in the three cardinal directions where _pad_size_ = (pad_x, pad_y, pad_z). Padding is applied to all sides of the image. 
 
 **out**: image of type torch.tensor with shape  [B, C, X+pad_size[0], Y+pad_size[1], Z+pad_size[2]]
 

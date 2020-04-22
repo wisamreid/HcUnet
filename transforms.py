@@ -239,10 +239,13 @@ class random_crop:
         np.random.seed(seed)
         if image.ndim == 4:  # 3D image
             shape = image.shape
+
+            shape[shape[0:2] > self.dim] = self.dim[[shape[0:2] > self.dim]]
+
             x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
             z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
-        elif image.ndim == 3:  # 3D image
+        elif image.ndim == 3:  # 2D image
             shape = image.shape
             x = np.random.randint(0, self.dim[0] - shape[0] + 1, 1)
             y = np.random.randint(0, self.dim[1] - shape[1] + 1, 1)
@@ -257,5 +260,31 @@ class random_crop:
 
         if image.ndim == 3:  # 3D image
             out = image[x:x + self.dim[0] - 1:1, y:y + self.dim[1] - 1:1, :]
+
+        return out
+
+
+class nul_crop:
+
+    def __init__(self):
+        pass
+
+    def __call__(self, image_list):
+        """
+        IMAGE MASK PWL
+        :param image:
+        :return:
+        """
+        if not isinstance(image_list, list):
+            raise ValueError(f'Expected input to be list but got {type(image_list)}')
+
+        out = []
+        mask = image_list[1]
+
+        lr = mask.sum(dim=2) > 1
+        ud = mask.sum(dim=3) > 1
+
+        for i, im in enumerate(image_list):
+            out.append(im[:,:,lr,ud,:])
 
         return out
