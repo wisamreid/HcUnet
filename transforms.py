@@ -279,12 +279,15 @@ class nul_crop:
             raise ValueError(f'Expected input to be list but got {type(image_list)}')
 
         out = []
+
         mask = image_list[1]
-
-        lr = mask.sum(dim=2) > 1
-        ud = mask.sum(dim=3) > 1
-
+        lr = mask.sum(axis=1).sum(axis=1).flatten() > 1
         for i, im in enumerate(image_list):
-            out.append(im[:,:,lr,ud,:])
+            image_list[i] = im[lr, :, :, :]
+
+        mask = image_list[1]
+        ud = mask.sum(axis=0).sum(axis=1).flatten() > 1
+        for i, im in enumerate(image_list):
+            out.append(im[:, ud, :, :])
 
         return out
