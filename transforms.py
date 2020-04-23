@@ -219,6 +219,21 @@ class normalize:
                 image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
         return image
 
+class drop_channel:
+    def __init__(self, chance):
+        self.chance = chance
+
+    def __call__(self, image):
+        """
+        assume in [x,y,z,c]
+        :param image:
+        :return:
+        """
+        if np.random.random() > self.chance:
+            i = np.random.randint(0, image.shape[-1])
+            image[:, :, :, i] = 0
+        return image
+
 
 class random_crop:
     def __init__(self, dim):

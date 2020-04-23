@@ -34,6 +34,27 @@ class stack(Dataset):
         if len(self.files) == 0:
             raise FileExistsError('No Valid Mask Files Found')
 
+        self.image=[]
+        self.mask=[]
+        self.pwl=[]
+
+        for file in self.files:
+            file_with_mask = os.path.splitext(file)[0]
+
+            image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
+            pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
+            mask_path = file
+            self.image.append(io.imread(image_data_path))
+
+            try:
+                self.mask.append(io.imread(mask_path)[:, :, :, 0])
+            except IndexError:
+                self.mask.append(io.imread(mask_path))
+
+            self.pwl.append(io.imread(pwl_data_path))
+
+
+
     def __len__(self):
         return len(self.files)
 
@@ -42,19 +63,9 @@ class stack(Dataset):
         # Expect files to contain two endings *.mask.tif
         # with first run of os.path.splitext we remove .tif
         # with second pass we remove .mask
-        file_with_mask = os.path.splitext(self.files[item])[0]
-
-        image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
-        pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
-        mask_path = self.files[item]
-
-        image = io.imread(image_data_path)
-        try:
-            mask = io.imread(mask_path)[:,:,:,0]
-        except IndexError:
-            mask = io.imread(mask_path)
-
-        pwl = io.imread(pwl_data_path)
+        image = self.image[item]
+        mask = self.mask[item]
+        pwl = self.pwl[item]
 
         # We have to assume there is always a channel index at the last dim
         # So for 3D its [Z,Y,X,C]
