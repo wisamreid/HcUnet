@@ -101,6 +101,7 @@ class unet_constructor(nn.Module):
                                         ))
             i += 1
         i = -2
+        #test
         for f in feature_sizes[:0:-1]:
             self.up_steps.append(Up(conv_functions,
                                     in_channels=f,
