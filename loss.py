@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 
 
-
-def cross_entropy_loss(pred, mask, pwl):
+def cross_entropy_loss(pred, mask, pwl, weight):
     pred_shape = pred.shape
     if len(pred_shape) == 5:
         mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
@@ -21,12 +20,13 @@ def cross_entropy_loss(pred, mask, pwl):
     #     cel = nn.CrossEntropyLoss(reduction='none', weight=torch.tensor([0,2.25]).float().cuda())
     #     l = cel(pred, mask)
 
-    cel = nn.BCEWithLogitsLoss(reduction='none', weight=torch.tensor([2]).float().cuda())
+    #cel = nn.BCEWithLogitsLoss(reduction='none', weight=torch.tensor([weight]).float().cuda())
+    cel = nn.BCEWithLogitsLoss(reduction='none')
     l = cel(pred.float(), mask.float())
 
     # loss = cel(pred, mask.long().squeeze(1))  # HAVE TO SQUEEZE FEATURE DIM IN THIS CASE FOR SOME REASON.
 
-    return (l*pwl).mean()
+    return (l*pwl*((mask+1)*weight)).mean()
 
 
 def dice_loss(pred, mask):
@@ -43,7 +43,36 @@ def dice_loss(pred, mask):
     intersection = pred * mask
     union = (pred + mask).sum()
 
-    loss = (2*intersection.sum()+1e-10 ) / (union+1e-10)
+    loss = (2*intersection.sum()+1e-10) / (union+1e-10)
 
     return 1-loss
 
+
+def random_cross_entropy(pred, mask, pwl, weight, size):
+    pred_shape = pred.shape
+    if len(pred_shape) == 5:
+        mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
+        pwl = pwl[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
+    elif len(pred_shape) == 4:
+        mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1]
+        pwl = pwl[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1]
+    else:
+        raise IndexError(f'Unexpected number of predicted mask dimmnsions. Expected 4 (2D) or 5 (3D) but got' +
+                         f' {len(pred_shape)} dimensions: {pred_shape}')
+
+    cel = nn.BCEWithLogitsLoss(reduction='none')
+
+    pred = pred.reshape(-1)
+    mask = mask.reshape(-1)
+    pwl = pwl.reshape(-1)
+
+    pos_ind = torch.randint(low=0, high=int((mask==1).sum()), size=(1, size))[0, :]
+    neg_ind = torch.randint(low=0, high=int((mask==0).sum()), size=(1, size))[0, :]
+
+    pred = torch.cat([pred[mask==1][pos_ind], pred[mask==0][neg_ind]])
+    pwl = torch.cat([pwl[mask==1][pos_ind], pwl[mask==0][neg_ind]])
+    mask = torch.cat([mask[mask==1][pos_ind], mask[mask==0][neg_ind]])
+
+    l = cel(pred.float(), mask.float())
+
+    return (l*pwl).mean()

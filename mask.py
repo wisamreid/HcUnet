@@ -1,9 +1,7 @@
 import numpy as np
-import numpy as np
+import scipy.ndimage.morphology
 import skimage.io as io
 from numba import njit
-import pickle
-import scipy.ndimage.morphology
 
 
 class makePWL:

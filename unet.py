@@ -89,7 +89,6 @@ class unet_constructor(nn.Module):
                                     dilation=dilation,
                                     groups=groups,
                                     ))
-
         i = 1
         for f in feature_sizes[1::]:
             self.down_steps.append(Down(conv_functions,
@@ -101,7 +100,6 @@ class unet_constructor(nn.Module):
                                         ))
             i += 1
         i = -2
-        #test
         for f in feature_sizes[:0:-1]:
             self.up_steps.append(Up(conv_functions,
                                     in_channels=f,
@@ -137,8 +135,6 @@ class unet_constructor(nn.Module):
         outputs = None  # Do this to clear memory
 
         return x
-
-
 
     def save(self, filename):
         model = {'state_dict': self.state_dict(),
@@ -254,6 +250,8 @@ class Up(nn.Module):
                  dilation: dict,
                  groups: dict,
                  ):
+
+
         super(Up, self).__init__()
         self.conv1 = conv_functions[0](in_channels,
                                        out_channels,
@@ -267,12 +265,17 @@ class Up(nn.Module):
                                        dilation=dilation['conv2'],
                                        groups=groups['conv2'],
                                        padding=0)
-
-        self.up_conv = conv_functions[1](in_channels,
-                                         out_channels,
-                                         upsample_kernel,
-                                         stride=upsample_stride,
-                                         padding=0)
+        if conv_functions[1] == torch.nn.modules.conv.ConvTranspose3d:
+            self.up_conv = conv_functions[1](in_channels,
+                                             out_channels,
+                                             upsample_kernel,
+                                             stride=upsample_stride,
+                                             padding=0)
+            self.lin_up = False
+        elif conv_functions[1] == torch.nn.upsampling.Upsample:
+            self.lin_up = True
+        else:
+            raise RuntimeError('fuck')
 
         self.batch1 = conv_functions[3](out_channels)
         self.batch2 = conv_functions[3](out_channels)
