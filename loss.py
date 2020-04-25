@@ -24,9 +24,7 @@ def cross_entropy_loss(pred, mask, pwl, weight):
     cel = nn.BCEWithLogitsLoss(reduction='none')
     l = cel(pred.float(), mask.float())
 
-    # loss = cel(pred, mask.long().squeeze(1))  # HAVE TO SQUEEZE FEATURE DIM IN THIS CASE FOR SOME REASON.
-
-    return (l*pwl*((mask+1)*weight)).mean()
+    return (l*(pwl+1)).mean()
 
 
 def dice_loss(pred, mask):
@@ -69,10 +67,10 @@ def random_cross_entropy(pred, mask, pwl, weight, size):
     pos_ind = torch.randint(low=0, high=int((mask==1).sum()), size=(1, size))[0, :]
     neg_ind = torch.randint(low=0, high=int((mask==0).sum()), size=(1, size))[0, :]
 
-    pred = torch.cat([pred[mask==1][pos_ind], pred[mask==0][neg_ind]])
-    pwl = torch.cat([pwl[mask==1][pos_ind], pwl[mask==0][neg_ind]])
-    mask = torch.cat([mask[mask==1][pos_ind], mask[mask==0][neg_ind]])
+    pred = torch.cat([pred[mask==1][pos_ind], pred[mask==0][neg_ind]]).unsqueeze(0)
+    pwl = torch.cat([pwl[mask==1][pos_ind], pwl[mask==0][neg_ind]]).unsqueeze(0)
+    mask = torch.cat([mask[mask==1][pos_ind], mask[mask==0][neg_ind]]).unsqueeze(0)
 
     l = cel(pred.float(), mask.float())
 
-    return (l*pwl).mean()
+    return (l*(pwl+1)).mean()
