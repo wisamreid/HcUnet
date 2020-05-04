@@ -4,6 +4,7 @@ from skimage import io
 from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
+from PIL import Image, TiffImagePlugin
 try:
     import transforms as t
 except ModuleNotFoundError:
@@ -85,11 +86,10 @@ class stack(Dataset):
 
         return image, mask, pwl
 
-    @staticmethod
-    def image(path, transform):
-
-        image = io.imread(path)
-        for t in transform:
-            image = t(image)
-
-        return image
+def test_image(path, transforms):
+    image = io.imread(path)
+    print(image.dtype)
+    for t in transforms:
+        print(t)
+        image = t(image)
+    return image[0]

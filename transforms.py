@@ -1,7 +1,11 @@
 import torch
 import scipy.ndimage as ndimage
 import skimage.exposure as exposure
+import numexpr as ne
 import numpy as np
+from numba import njit
+
+
 
 
 # DECORATOR
@@ -39,25 +43,24 @@ def joint_transform(func):
     return wrapper
 
 
-class int16_to_float:
-    def __init__(self):
-        pass
-
-    def __call__(self, image: np.int16):
-        if not image.dtype == 'uint16':
-            raise TypeError(f'Expected image datatype to be uint16 but got {image.dtype}')
-        return (image / 2 ** 16).astype(np.float)
-
-
-class int8_to_float:
-    def __init__(self):
-        pass
-
-    def __call__(self, image: np.int) -> np.ndarray:
-        if not image.dtype == 'uint8':
-            raise TypeError(f'Expected image datatype to be uint8 but got {image.dtype}')
-        return (image / 255).astype(np.float)
-
+# class int16_to_float:
+#     def __init__(self):
+#         pass
+#
+#     def __call__(self, image: np.int16):
+#         if not image.dtype == 'uint16':
+#             raise TypeError(f'Expected image datatype to be uint16 but got {image.dtype}')
+#         return (image / 2 ** 16).astype('f16')
+#
+#
+# class int8_to_float:
+#     def __init__(self):
+#         pass
+#
+#     def __call__(self, image: np.int) -> np.ndarray:
+#         if not image.dtype == 'uint8':
+#             raise TypeError(f'Expected image datatype to be uint8 but got {image.dtype}')
+#         return ne.evaluate('image / 255').astype('f16')
 
 class to_float:
     def __init__(self):
@@ -66,14 +69,19 @@ class to_float:
     @joint_transform
     def __call__(self, image, seed=None):
         if image.dtype == 'uint16':
-            out = (image / 2 ** 16).astype(np.float)
+            image = image.astype(dtype='float16', casting='same_kind', copy=False)
+            image /= 2*16
+            print(image.dtype, image.max)
+            # image = np.divide(image, 2**16, dtype='float16', where=image)
         elif image.dtype == 'uint8':
-            out = (image / 255).astype(np.float)
+            image = image.astype('float16', copy=False, casting='same_kind')
+            image /= 2**8
+            # image = np.divide(image.astype('float16', copy=False), 2**8, dtype=np.float16)
         elif image.dtype == 'float':
-            out = image
+            pass
         else:
-            raise TypeError(f'Expected image datatype of uint8 or uint16 but got {image.dtype}')
-        return out
+            raise TypeError('Expected image datatype of uint8 or uint16 ')
+        return image
 
 
 class to_tensor:
@@ -91,7 +99,7 @@ class to_tensor:
         if not isinstance(image, np.ndarray):
             raise TypeError(f'Expected list but got {type(image)}')
         num_dims = len(image.shape)
-        image = torch.tensor(image)
+        image = torch.as_tensor(image, dtype=torch.half)
         # Performs these operations in this order...
         # [x,y,z,c] -> [1,x,y,z,c] -> [c,x,y,z,1] -> [c,x,y,z] -> [1,c,x,y,z]
         return image.unsqueeze(0).transpose(num_dims, 0).squeeze(dim=image.dim()).unsqueeze(0)
@@ -210,13 +218,19 @@ class normalize:
         self.std = std
 
     def __call__(self, image):
+        if isinstance(image, list):
+            image = image[0]
         shape = image.shape
         if image.ndim == 4:
             for channel in range(shape[-1]):
-                image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
-        if image.ndim == 3:
-            for channel in range(shape[-1]):
-                image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
+                image[:,:,:,channel] += -self.mean[channel]
+                image[:,:,:,channel] /=  self.std[channel]
+                # image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
+        # if image.ndim == 3:
+        #     for channel in range(shape[-1]):
+        #         image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
+        else:
+            raise ValueError('Wrong dims yo')
         return image
 
 class drop_channel:
@@ -283,8 +297,8 @@ class random_crop:
 
 class nul_crop:
 
-    def __init__(self):
-        pass
+    def __init__(self, rate=1):
+        self.rate = rate
 
     def __call__(self, image_list):
         """
@@ -294,6 +308,7 @@ class nul_crop:
         """
         if not isinstance(image_list, list):
             raise ValueError(f'Expected input to be list but got {type(image_list)}')
+
 
         out = []
 
@@ -306,5 +321,9 @@ class nul_crop:
         ud = mask.sum(axis=0).sum(axis=1).flatten() > 1
         for i, im in enumerate(image_list):
             out.append(im[:, ud, :, :])
+
+        # IN some cases we dont want to do this to expose the network to background images
+        if np.random.random() > self.rate:
+            out = image_list
 
         return out
