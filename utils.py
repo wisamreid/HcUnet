@@ -50,6 +50,7 @@ def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     # top_pad = image[:, :, :, :, -pad_size[2]::].flip(4)
 
     image_size = image.shape  # expect x,y,z,c
+    pad_size = np.array(pad_size)//2
 
     out_size = [
                 image_size[0] + pad_size[0],  # x
@@ -98,16 +99,14 @@ def predict_mask(model, image, device):
     :return mask:
 
     """
-    EVAL_IMAGE_SIZE = (250, 250, 12)
-    PAD_SIZE = (100, 100, 10)
+    PAD_SIZE = (100, 100, 6)
+    print(f'SETTING SLICE TO {(image.shape[2]+PAD_SIZE[2] )}->{(image.shape[2]+PAD_SIZE[2] )// 2}')
+    EVAL_IMAGE_SIZE = (500, 500, 46)#image.shape[2])
 
     mask = torch.zeros((1,1,image.shape[0],image.shape[1], image.shape[2]), dtype=np.bool)
     im_shape = image.shape
     # Apply Padding
-    print('trying to apply padding')
     image = pad_image_with_reflections(torch.as_tensor(image), pad_size=PAD_SIZE)
-    print('dtype', type(image))
-    print(image.shape)
     #  We now calculate the indicies for our image
     x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], image.shape[0])
     y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], image.shape[1])
@@ -119,15 +118,14 @@ def predict_mask(model, image, device):
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             for k, z in enumerate(z_ind):
-                print(f'\r{iterations}/{max}',end='')
+                print(f'\r{iterations}/{max} ',end=' ')
                 padded_image_slice = t.to_tensor()(image[x[0]:x[1], y[0]:y[1]:, z[0]:z[1], :].numpy())
+                print(padded_image_slice.shape, end='')
                 # padded_image_slice = image[:,:,x[0]:x[1], y[0]:y[1]:, z[0]:z[1]]
                 with torch.no_grad():
                     valid_out = model(padded_image_slice.float().to(device))
 
-                print('valid out shape', valid_out.shape)
-
-                valid_out  = valid_out[:,:,
+                valid_out = valid_out[:,:,
                                      PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
                                      PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
                                      PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2],
@@ -147,10 +145,7 @@ def predict_mask(model, image, device):
 
 
 def calculate_indexes(pad_size, eval_image_size, image_shape, dim_shape):
-    print('pad_size', pad_size)
-    print('eval_image_size',eval_image_size)
-    print('im shape', image_shape)
-    print('dim_shape',dim_shape)
+
     ind_list = torch.arange(pad_size, image_shape, eval_image_size)
     ind = []
     for i, z in enumerate(ind_list):

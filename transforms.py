@@ -70,8 +70,7 @@ class to_float:
     def __call__(self, image, seed=None):
         if image.dtype == 'uint16':
             image = image.astype(dtype='float16', casting='same_kind', copy=False)
-            image /= 2*16
-            print(image.dtype, image.max)
+            image /= 2**16
             # image = np.divide(image, 2**16, dtype='float16', where=image)
         elif image.dtype == 'uint8':
             image = image.astype('float16', copy=False, casting='same_kind')
@@ -184,7 +183,7 @@ class random_affine:
         mat[0, 1] = translation_x
         mat[1, 0] = translation_y
 
-        return ndimage.affine_transform(image, mat, order=0, output_shape=image.shape, mode='reflect')
+        return ndimage.affine_transform(image.astype(np.float), mat, order=0, output_shape=image.shape, mode='reflect')
 
 
 class random_rotate:
@@ -209,7 +208,7 @@ class random_rotate:
         else:
             theta = self.angle
 
-        return ndimage.rotate(image, angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
+        return ndimage.rotate(image.astype(np.float), angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
 
 
 class normalize:
@@ -275,7 +274,12 @@ class random_crop:
 
             x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
-            z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
+            if self.dim[2] > shape[2]:
+                z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
+            else:
+                z = 0
+                self.dim[2] = shape[2]
+
         elif image.ndim == 3:  # 2D image
             shape = image.shape
             x = np.random.randint(0, self.dim[0] - shape[0] + 1, 1)
