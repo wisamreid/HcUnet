@@ -63,6 +63,8 @@ print('done')
 
 y_ind = np.linspace(0, image.shape[1], 3).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], 3).astype(np.int16)
+print(y_ind)
+print(x_ind)
 base = './maskfiles/'
 newfolder = time.strftime('%y%m%d%H%M')
 os.mkdir(base+newfolder)
@@ -73,13 +75,28 @@ for i, y in enumerate(y_ind):
         if j == 0: continue
 
         im_slice = image[:, y_ind[i-1]:y, x_ind[j-1]:x, :]
+
         for t in transforms:
             im_slice = t(im_slice)
 
         a = mask.Part(utils.predict_mask(test, im_slice, device).numpy(), (x_ind[j-1], y_ind[i-1]))
+
         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.pkl','wb'))
+        a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
+        io.imsave(f'yeet{i}{j}.tif', np.multiply(a, 255))
+
+        # a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
+        # io.imsave(f'yeet{i}{j}.tif', a)
         print('Done!')
 
+
+
+image = 0
+
+tl = io.imread('yeet11.tif')
+tr = io.imread('yeet12.tif')
+bl = io.imread('yeet21.tif')
+br = io.imread('yeet22.tif')
 
 
 

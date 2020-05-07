@@ -50,12 +50,12 @@ def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     # top_pad = image[:, :, :, :, -pad_size[2]::].flip(4)
 
     image_size = image.shape  # expect x,y,z,c
-    pad_size = np.array(pad_size)//2
+    pad_size = np.array(pad_size)
 
     out_size = [
-                image_size[0] + pad_size[0],  # x
-                image_size[1] + pad_size[1],  # y
-                image_size[2] + pad_size[2],  # z
+                image_size[0] + pad_size[0]*2,  # x
+                image_size[1] + pad_size[1]*2,  # y
+                image_size[2] + pad_size[2]*2,  # z
                 image_size[3]
                 ]
 
@@ -87,6 +87,7 @@ def predict_mask(model, image, device):
     Takes in a model and an image and applies the model to all parts of the image.
 
     ALGORITHM:
+    Remove inf and nan ->
     apply padding ->
     calculate indexes for unet based on image.shape ->
     apply Unet on slices of image based on indexes ->
@@ -99,41 +100,58 @@ def predict_mask(model, image, device):
     :return mask:
 
     """
-    PAD_SIZE = (100, 100, 6)
-    print(f'SETTING SLICE TO {(image.shape[2]+PAD_SIZE[2] )}->{(image.shape[2]+PAD_SIZE[2] )// 2}')
-    EVAL_IMAGE_SIZE = (500, 500, 46)#image.shape[2])
+    PAD_SIZE = (76, 76, 6)
+    EVAL_IMAGE_SIZE = (500, 500, 20)
 
-    mask = torch.zeros((1,1,image.shape[0],image.shape[1], image.shape[2]), dtype=np.bool)
+    mask = torch.zeros((1, 1, image.shape[0], image.shape[1], image.shape[2]), dtype=torch.bool)
     im_shape = image.shape
+
+    # inf and nan screw up model evaluation. Happens occasionally
+    image[np.isnan(image)] = 0
+    image[np.isinf(image)] = 1
+
     # Apply Padding
     image = pad_image_with_reflections(torch.as_tensor(image), pad_size=PAD_SIZE)
+
     #  We now calculate the indicies for our image
     x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], image.shape[0])
     y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], image.shape[1])
     z_ind = calculate_indexes(PAD_SIZE[2], EVAL_IMAGE_SIZE[2], im_shape[2], image.shape[2])
 
     iterations = 0
-    max = len(x_ind) * len(y_ind) * len(z_ind)
+    max_iter = (len(x_ind) * len(y_ind) * len(z_ind))-1
+
     # Loop and apply unet
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             for k, z in enumerate(z_ind):
-                print(f'\r{iterations}/{max} ',end=' ')
-                padded_image_slice = t.to_tensor()(image[x[0]:x[1], y[0]:y[1]:, z[0]:z[1], :].numpy())
-                print(padded_image_slice.shape, end='')
-                # padded_image_slice = image[:,:,x[0]:x[1], y[0]:y[1]:, z[0]:z[1]]
+                print(f'\r{iterations}/{max_iter} ', end=' ')
+                # t.to_tensor reshapes image to [B C X Y Z]!!!
+                padded_image_slice = t.to_tensor()(image[x[0]:x[1], y[0]:y[1]:, z[0]:z[1], :].numpy()).float()
+
+                # Occasionally everything is just -1 in the whole mat. Skip for speed
+                if (padded_image_slice.float() != -1).sum() == 0:
+                    iterations += 1
+                    continue
+
                 with torch.no_grad():
                     valid_out = model(padded_image_slice.float().to(device))
 
                 valid_out = valid_out[:,:,
                                      PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
                                      PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
-                                     PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2],
-                                         ]
+                                     PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
+
 
                 #do everthing in place to save memory
-                F.relu_(valid_out)
-                valid_out.gt_(.5)
+                # Do the sigmoid in place manually
+                # 1/ (1+exp(-x))
+                valid_out.mul_(-1)
+                valid_out.exp_()
+                valid_out.add_(1)
+                valid_out.pow_(-1)
+
+                valid_out.gt_(.5)  # Greater Than
 
                 mask[:, :, x[0]:x[0]+valid_out.shape[2],
                            y[0]:y[0]+valid_out.shape[3],
@@ -141,10 +159,23 @@ def predict_mask(model, image, device):
 
                 iterations += 1
 
+    print('\ndone!')
     return mask
 
 
 def calculate_indexes(pad_size, eval_image_size, image_shape, dim_shape):
+    """
+    PAD_SIZE
+    EVAL_IMAGE_SIZE
+    IMAGE_SHAPE
+    PADDED_IMAGE_SHAPE
+
+    :param pad_size:
+    :param eval_image_size:
+    :param image_shape:
+    :param dim_shape:
+    :return:
+    """
 
     ind_list = torch.arange(pad_size, image_shape, eval_image_size)
     ind = []
