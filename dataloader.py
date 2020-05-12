@@ -4,6 +4,7 @@ from skimage import io
 from torch.utils.data import Dataset
 import glob as glob
 import numpy as np
+import ray
 from PIL import Image, TiffImagePlugin
 try:
     import transforms as t
@@ -25,6 +26,7 @@ class stack(Dataset):
         :param csv_file:
         :param transfrom:
         """
+
 
         self.image_transforms = image_transforms
         self.out_transforms = out_transforms
@@ -76,9 +78,11 @@ class stack(Dataset):
 
         # May Turn to Torch
 
-
+        import time
+        a = time.time_ns()
         for jt in self.joint_transforms:
             image, mask, pwl = jt([image, mask, pwl])
+        print(time.time_ns()-a)
         for it in self.image_transforms:
             image = it(image)
         for ot in self.out_transforms:

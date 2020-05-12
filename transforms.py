@@ -4,7 +4,7 @@ import skimage.exposure as exposure
 import numexpr as ne
 import numpy as np
 from numba import njit
-import ray
+import copy
 
 
 
@@ -19,7 +19,6 @@ def joint_transform(func):
     :param func: Function with arguments 'image' and 'seed'
     :return: Wrapped function that can now accept lists
     """
-    func = ray.remote(func)
 
     def wrapper(*args):
         image_list = args[-1]  # In the case of a class function, there may be two args, one is 'self'
@@ -36,12 +35,11 @@ def joint_transform(func):
         seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
             if len(args) > 1:
-                out.append(func.remote(args[0], image=im, seed=seed))
+                out.append(func(args[0], image=im, seed=seed))
             else:
-                out.append(func.remote(image=im, seed=seed))
+                out.append(func(image=im, seed=seed))
         if len(out) == 1:
             out = out[0]
-        out = ray.get(out)
         return out
 
     return wrapper
@@ -292,38 +290,39 @@ class random_crop:
         """
         if not isinstance(image, np.ndarray):
             raise ValueError(f'Expected input to be list but got {type(image)}')
+        dim = copy.copy(self.dim)
 
         np.random.seed(seed)
         if image.ndim == 4:  # 3D image
             shape = image.shape[0:-1]
-            ind = shape < self.dim
+            ind = shape < dim
             for i, val in enumerate(ind):
                 if val:
-                    self.dim[i] = shape[i]
+                    dim[i] = shape[i]
 
-            x = int(np.random.randint(0, shape[0] - self.dim[0] + 1, 1))
-            y = int(np.random.randint(0, shape[1] - self.dim[1] + 1, 1))
-            if self.dim[2] > shape[2]:
-                z = int(np.random.randint(0, shape[2] - self.dim[2] + 1, 1))
+            x = int(np.random.randint(0, shape[0] - dim[0] + 1, 1))
+            y = int(np.random.randint(0, shape[1] - dim[1] + 1, 1))
+            if dim[2] > shape[2]:
+                z = int(np.random.randint(0, shape[2] - dim[2] + 1, 1))
             else:
                 z = 0
-                self.dim[2] = shape[2]
+                dim[2] = shape[2]
 
         elif image.ndim == 3:  # 2D image
             shape = image.shape
-            x = np.random.randint(0, self.dim[0] - shape[0] + 1, 1)
-            y = np.random.randint(0, self.dim[1] - shape[1] + 1, 1)
+            x = np.random.randint(0, dim[0] - shape[0] + 1, 1)
+            y = np.random.randint(0, dim[1] - shape[1] + 1, 1)
         else:
             raise ValueError(f'Expected np.ndarray with 3/4 ndims but found {image.ndim}')
 
-        if not np.all(image.shape[0:-1:1] >= np.array(self.dim)):
-            raise IndexError(f'Output dimmensions: {self.dim} are larger than input image: {shape}')
+        if not np.all(image.shape[0:-1:1] >= np.array(dim)):
+            raise IndexError(f'Output dimmensions: {dim} are larger than input image: {shape}')
 
         if image.ndim == 4:  # 3D image
-            out = image[x:x + self.dim[0] - 1:1, y:y + self.dim[1] - 1:1, z:z + self.dim[2] - 1:1, :]
+            out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, z:z + dim[2] - 1:1, :]
 
         if image.ndim == 3:  # 3D image
-            out = image[x:x + self.dim[0] - 1:1, y:y + self.dim[1] - 1:1, :]
+            out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, :]
 
         return out
 
