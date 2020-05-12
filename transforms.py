@@ -4,7 +4,7 @@ import skimage.exposure as exposure
 import numexpr as ne
 import numpy as np
 from numba import njit
-
+import ray
 
 
 
@@ -14,9 +14,12 @@ def joint_transform(func):
     This wrapper generates a seed value for each transform and passes an image from a list to that function
     It then passes images from a list to the function one at a time and returns a list of outputs
 
+    ATTEMPTING TO PARALLELIZE
+
     :param func: Function with arguments 'image' and 'seed'
     :return: Wrapped function that can now accept lists
     """
+    func = ray.remote(func)
 
     def wrapper(*args):
         image_list = args[-1]  # In the case of a class function, there may be two args, one is 'self'
@@ -33,11 +36,12 @@ def joint_transform(func):
         seed = np.random.randint(0, 1e8, 1)
         for im in image_list:
             if len(args) > 1:
-                out.append(func(args[0], image=im, seed=seed))
+                out.append(func.remote(args[0], image=im, seed=seed))
             else:
-                out.append(func(image=im, seed=seed))
+                out.append(func.remote(image=im, seed=seed))
         if len(out) == 1:
             out = out[0]
+        out = ray.get(out)
         return out
 
     return wrapper
@@ -329,6 +333,7 @@ class nul_crop:
     def __init__(self, rate=1):
         self.rate = rate
 
+    # Cant be a @joint_transform because it needs info from one image to affect transforms of other
     def __call__(self, image_list):
         """
         IMAGE MASK PWL
@@ -338,21 +343,18 @@ class nul_crop:
         if not isinstance(image_list, list):
             raise ValueError(f'Expected input to be list but got {type(image_list)}')
 
-
-        out = []
-
-        mask = image_list[1]
-        lr = mask.sum(axis=1).sum(axis=1).flatten() > 1
-        for i, im in enumerate(image_list):
-            image_list[i] = im[lr, :, :, :]
-
-        mask = image_list[1]
-        ud = mask.sum(axis=0).sum(axis=1).flatten() > 1
-        for i, im in enumerate(image_list):
-            out.append(im[:, ud, :, :])
-
-        # IN some cases we dont want to do this to expose the network to background images
         if np.random.random() > self.rate:
+            out = []
+            mask = image_list[1]
+            lr = mask.sum(axis=1).sum(axis=1).flatten() > 1
+            for i, im in enumerate(image_list):
+                image_list[i] = im[lr, :, :, :]
+
+            mask = image_list[1]
+            ud = mask.sum(axis=0).sum(axis=1).flatten() > 1
+            for i, im in enumerate(image_list):
+                out.append(im[:, ud, :, :])
+        else:
             out = image_list
 
         return out
