@@ -1,11 +1,14 @@
 import numpy as np
+import torch
+
 
 class Part:
-
     def __init__(self, mask, loc):
-        self.shape = mask
+        if isinstance(mask, torch.Tensor):
+            mask = mask.numpy()
+        self.shape = mask.shape
         self.is_nul = not mask.sum() > 0
-        self.loc = loc  # This should be the top left corner ind
+        self.loc = np.array(loc)  # This should be the top left corner ind
         self.mask = mask
 
     @property

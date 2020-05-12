@@ -247,6 +247,31 @@ class drop_channel:
             image[:, :, :, i] = 0
         return image
 
+class random_intensity:
+        def __init__(self, range=(.5,1.2), chance=.5):
+            self.range = range
+            self.chance = chance
+
+        def __call__(self, image):
+            """
+            assume in [x,y,z,c]
+            :param image:
+            :return:
+            """
+            # if np.random.random() > self.chance:
+            #     range_min = np.random.randint(0, self.range[0]*10)/100
+            #     range_max = np.random.randint(80, self.range[1]*100)/100
+            #     image = exposure.rescale_intensity(image, 'image', (range_min, range_max))
+            #     image[image > 1] = 1
+            #     image[image < 0] = 0
+            if np.random.random() > self.chance:
+                image = exposure.rescale_intensity(image, 'image', (0,.7))
+                image[image < 0 ] = 0
+                image[np.isnan(image)] = 0
+                image[np.isinf(image)] = 1
+
+            return image
+
 
 class random_crop:
     def __init__(self, dim):

@@ -25,7 +25,6 @@ import scipy.ndimage
 import pickle
 import time
 
-from scipy.interpolate import splprep, splev
 
 path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 
@@ -34,16 +33,14 @@ transforms = [
               t.reshape(),
               t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]),
               ]
-print('Loading image: ', end='')
-image = io.imread(path)
-print(image.shape, end = '  ')
-print('done')
 
-print('init model: ', end='')
+image = io.imread(path)
+
 if torch.cuda.is_available():
     device = 'cuda:0'
 else:
     device = 'cpu'
+
 test = GUnet(image_dimensions=3,
              in_channels=4,
              out_channels=1,
@@ -54,17 +51,15 @@ test = GUnet(image_dimensions=3,
              upsample_stride=(2, 2, 1),
              dilation=1,
              groups=2).to(device)
-test.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/Apr27_chris-MS-7C37_1.unet')
+
+test.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/May11_chris-MS-7C37_1.unet')
 test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 test.to(device)
 test.eval()
-print('done')
-
 
 y_ind = np.linspace(0, image.shape[1], 3).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], 3).astype(np.int16)
-print(y_ind)
-print(x_ind)
+
 base = './maskfiles/'
 newfolder = time.strftime('%y%m%d%H%M')
 os.mkdir(base+newfolder)
@@ -81,24 +76,13 @@ for i, y in enumerate(y_ind):
 
         a = mask.Part(utils.predict_mask(test, im_slice, device).numpy(), (x_ind[j-1], y_ind[i-1]))
 
-        pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.pkl','wb'))
+        pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
-        io.imsave(f'yeet{i}{j}.tif', np.multiply(a, 255))
-
-        # a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
-        # io.imsave(f'yeet{i}{j}.tif', a)
-        print('Done!')
-
-
-
 image = 0
 
-tl = io.imread('yeet11.tif')
-tr = io.imread('yeet12.tif')
-bl = io.imread('yeet21.tif')
-br = io.imread('yeet22.tif')
 
-
+mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
 
 
 
