@@ -3,6 +3,8 @@ import numpy as np
 import skimage.exposure
 import skimage.filters
 import skimage.morphology
+import skimage.feature
+import skimage.segmentation
 import skimage
 import skimage.feature
 import scipy.ndimage
@@ -12,6 +14,7 @@ from scipy.interpolate import splprep, splev
 import pickle
 import glob
 import ray
+import cv2
 from multiprocessing import Pool
 import mask
 
@@ -295,9 +298,9 @@ def reconstruct_mask(path):
 
 
 def segment_mask(mask):
-    ray.init()
+
     PAD_SIZE = (10, 10, 0)
-    EVAL_IMAGE_SIZE = (1000, 1000, mask.shape[-1])
+    EVAL_IMAGE_SIZE = (500, 500, mask.shape[-1])
 
     im_shape = mask.shape[2::]
     x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], mask.shape[2])
@@ -305,28 +308,46 @@ def segment_mask(mask):
 
     iterations = 0
     max_iter = (len(x_ind) * len(y_ind))-1
-    distance = np.zeros(mask.shape, dtype=np.half)
+    distance = np.zeros(mask.shape, dtype=np.float16)
+    unique_mask = np.zeros(mask.shape, dtype=np.int32)
 
     @ray.remote
-    def par_fun(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, part):
-        distance_part = scipy.ndimage.morphology.distance_transform_edt(mask_slice)
+    def par_fun(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, mask_part):
+        if not mask_part.max(): # part should be a bool. Max would be True or False!
+            out = np.zeros((1, 1, EVAL_IMAGE_SIZE[0], EVAL_IMAGE_SIZE[1], mask_part.shape[-1]),dtype=np.float16)
+            return x, y, out, out.astype(np.int32)
+        # distance_part = scipy.ndimage.morphology.distance_transform_cdt(mask_part)
+        distance_part = np.zeros(mask_part.shape)
+        for i in range(distance_part.shape[-1]):
+            distance_part[0,0,:,:,i] = cv2.distanceTransform(mask_part[0,0,:,:,i].astype(np.uint8), cv2.DIST_L2, 5)
 
         distance_part = distance_part[:, :,
                         PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],
                         PAD_SIZE[1]:EVAL_IMAGE_SIZE[1] + PAD_SIZE[1],
                         :]
-        return x, y, distance_part.astype(np.half)
+        mask_part = mask_part[:, :,
+                        PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],
+                        PAD_SIZE[1]:EVAL_IMAGE_SIZE[1] + PAD_SIZE[1],
+                        :]
+        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, footprint=np.ones((1,1,10,10,10)),
+                                                       labels=mask_part, threshold_abs=1)
+        print(local_maximum.shape)
+        markers = scipy.ndimage.label(local_maximum)[0]
+        labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part)
+        return x, y, distance_part.astype(np.float16), labels
 
     # Loop and apply unet
     distance_part_list=[]
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             print(f'\r{iterations}/{max_iter} ', end=' ')
-            mask_slice = mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
+            mask_slice = mask[:, :, x[0]:x[1], y[0]:y[1]:, :] == 1
+
             distance_part_list.append(par_fun.remote(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, mask_slice))
             iterations += 1
 
     distance_part_list = ray.get(distance_part_list)
+    print('Finished Parallel Computation.')
 
     while distance_part_list:
         part = distance_part_list.pop(0)
@@ -338,5 +359,10 @@ def segment_mask(mask):
                  x[0]:x[0]+EVAL_IMAGE_SIZE[0],
                  y[0]:y[0]+EVAL_IMAGE_SIZE[1],
                  :] = part[2]
+        unique_mask[:,
+                    :,
+                    x[0]:x[0]+EVAL_IMAGE_SIZE[0],
+                    y[0]:y[0]+EVAL_IMAGE_SIZE[1],
+                    :] = part[3]
 
-    return distance
+    return distance, unique_mask

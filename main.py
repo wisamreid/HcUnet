@@ -52,7 +52,7 @@ test = GUnet(image_dimensions=3,
              dilation=1,
              groups=2).to(device)
 
-test.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/May11_chris-MS-7C37_1.unet')
+test.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/May14_chris-MS-7C37_2.unet')
 test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 test.to(device)
 test.eval()

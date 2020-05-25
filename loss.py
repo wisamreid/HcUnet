@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-def cross_entropy_loss(pred, mask, pwl, weight):
+def cross_entropy_loss(pred, mask, pwl, weight='worst_z'):
     pred_shape = pred.shape
     if len(pred_shape) == 5:
         mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
@@ -14,6 +14,8 @@ def cross_entropy_loss(pred, mask, pwl, weight):
         raise IndexError(f'Unexpected number of predicted mask dimmensions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimmensions: {pred_shape}')
 
+
+
     # if mask.long().max() == 1:
     #
     # else:
@@ -23,8 +25,12 @@ def cross_entropy_loss(pred, mask, pwl, weight):
     #cel = nn.BCEWithLogitsLoss(reduction='none', weight=torch.tensor([weight]).float().cuda())
     cel = nn.BCEWithLogitsLoss(reduction='none')
     l = cel(pred.float(), mask.float())
+    loss = (l*(pwl+1))
+    if weight == 'worst_z':
+        scaling = torch.linspace(1, 2, pred.shape[-1]) ** 2
+        loss = loss.sum(dim=-1).sort() * scaling
 
-    return (l*(pwl+1)).mean()
+    return loss.mean()
 
 
 def dice_loss(pred, mask):
@@ -38,10 +44,10 @@ def dice_loss(pred, mask):
                          f' {len(pred_shape)} dimmensions: {pred_shape}')
 
     pred = torch.sigmoid(pred)
-    intersection = pred * mask
-    union = (pred + mask).sum()
+    #intersection = pred * mask
+    #union = (pred + mask).sum()
 
-    loss = (2*intersection.sum()+1e-10) / (union+1e-10)
+    loss = (2*(pred * mask).sum()+1e-10) / ((pred + mask).sum() + 1e-10)
 
     return 1-loss
 

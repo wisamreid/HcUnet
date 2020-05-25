@@ -250,7 +250,7 @@ class drop_channel:
         return image
 
 class random_intensity:
-        def __init__(self, range=(.5,1.2), chance=.5):
+        def __init__(self, range=(.5,1.2), chance=.75):
             self.range = range
             self.chance = chance
 
@@ -266,11 +266,13 @@ class random_intensity:
             #     image = exposure.rescale_intensity(image, 'image', (range_min, range_max))
             #     image[image > 1] = 1
             #     image[image < 0] = 0
-            if np.random.random() > self.chance:
-                image = exposure.rescale_intensity(image, 'image', (0,.7))
-                image[image < 0 ] = 0
-                image[np.isnan(image)] = 0
-                image[np.isinf(image)] = 1
+            for c in range(image.shape[-1]):
+                if np.random.random() > self.chance:
+                    val = np.random.randint(0, 50, 1)/100
+                    image[:, :, :, c] -= val
+                    image[image < 0] = 0
+                    image[np.isnan(image)] = 0
+                    image[np.isinf(image)] = 1
 
             return image
 

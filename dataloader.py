@@ -78,11 +78,8 @@ class stack(Dataset):
 
         # May Turn to Torch
 
-        import time
-        a = time.time_ns()
         for jt in self.joint_transforms:
             image, mask, pwl = jt([image, mask, pwl])
-        print(time.time_ns()-a)
         for it in self.image_transforms:
             image = it(image)
         for ot in self.out_transforms:
