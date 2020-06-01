@@ -1,6 +1,7 @@
 import torch
 import scipy.ndimage as ndimage
 import skimage.exposure as exposure
+import skimage.transform as transform
 import numexpr as ne
 import numpy as np
 from numba import njit
@@ -71,11 +72,11 @@ class to_float:
     @joint_transform
     def __call__(self, image, seed=None):
         if image.dtype == 'uint16':
-            image = image.astype(dtype='float16', casting='same_kind', copy=False)
+            image = image.astype(dtype='float', casting='same_kind', copy=False)
             image /= 2**16
             # image = np.divide(image, 2**16, dtype='float16', where=image)
         elif image.dtype == 'uint8':
-            image = image.astype('float16', copy=False, casting='same_kind')
+            image = image.astype('float', copy=False, casting='same_kind')
             image /= 2**8
             # image = np.divide(image.astype('float16', copy=False), 2**8, dtype=np.float16)
         elif image.dtype == 'float':
@@ -185,7 +186,9 @@ class random_affine:
         mat[0, 1] = translation_x
         mat[1, 0] = translation_y
 
-        return ndimage.affine_transform(image.astype(np.float), mat, order=0, output_shape=image.shape, mode='reflect')
+        out = ndimage.affine_transform(image.astype(np.float), mat, order=0, output_shape=image.shape, mode='reflect')
+        return out.round()
+
 
 
 class random_rotate:
@@ -212,7 +215,6 @@ class random_rotate:
 
         return ndimage.rotate(image.astype(np.float), angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
 
-
 class normalize:
     def __init__(self, mean=[.5, .5, .5, .5], std=[.5, .5, .5, .5]):
         self.mean = mean
@@ -230,8 +232,16 @@ class normalize:
         # if image.ndim == 3:
         #     for channel in range(shape[-1]):
         #         image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
+        elif image.ndim == 3:
+            for channel in range(shape[-1]):
+                image[:,:,channel] += -self.mean[channel]
+                image[:,:,channel] /=  self.std[channel]
+                # image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
+        # if image.ndim == 3:
+        #     for channel in range(shape[-1]):
+        #         image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
         else:
-            raise ValueError('Wrong dims yo')
+            raise ValueError(f'Wrong dims yo: {image.ndim} {image.shape}')
         return image
 
 class drop_channel:
@@ -266,13 +276,22 @@ class random_intensity:
             #     image = exposure.rescale_intensity(image, 'image', (range_min, range_max))
             #     image[image > 1] = 1
             #     image[image < 0] = 0
-            for c in range(image.shape[-1]):
-                if np.random.random() > self.chance:
-                    val = np.random.randint(0, 50, 1)/100
-                    image[:, :, :, c] -= val
-                    image[image < 0] = 0
-                    image[np.isnan(image)] = 0
-                    image[np.isinf(image)] = 1
+            if image.ndim == 4:
+                for c in range(image.shape[-1]):
+                    if np.random.random() > self.chance:
+                        val = np.random.randint(0, 50, 1)/100
+                        image[:, :, :, c] -= val
+                        image[image < 0] = 0
+                        image[np.isnan(image)] = 0
+                        image[np.isinf(image)] = 1
+            elif image.ndim == 3:
+                for c in range(image.shape[-1]):
+                    if np.random.random() > self.chance:
+                        val = np.random.randint(0, 50, 1)/100
+                        image[:, :, c] -= val
+                        image[image < 0] = 0
+                        image[np.isnan(image)] = 0
+                        image[np.isinf(image)] = 1
 
             return image
 
@@ -328,7 +347,7 @@ class random_crop:
 
         return out
 
-
+# Cant be a @joint_transform because it needs info from one image to affect transforms of other
 class nul_crop:
 
     def __init__(self, rate=1):
@@ -344,7 +363,7 @@ class nul_crop:
         if not isinstance(image_list, list):
             raise ValueError(f'Expected input to be list but got {type(image_list)}')
 
-        if np.random.random() > self.rate:
+        if np.random.random() < self.rate:
             out = []
             mask = image_list[1]
             lr = mask.sum(axis=1).sum(axis=1).flatten() > 1
@@ -359,3 +378,139 @@ class nul_crop:
             out = image_list
 
         return out
+
+#  FROM FASTER_RCNN CODE
+
+class random_x_flip:
+    def __init__(self, rate=.5):
+        self.rate = rate
+    def __call__(self, image, boxes):
+        """
+        Code specifically for transforming images and boxes for fasterRCNN
+        Not Compatable with UNET
+
+        :param image:
+        :param boxes:
+        :return:
+        """
+        flip = np.random.uniform(0,1,1) < self.rate
+
+        shape = image.shape
+        boxes = np.array(boxes)
+
+        if flip:
+            image = np.copy(image[::-1,:,:])
+            boxes[:,1] = (boxes[:,1] * -1) + shape[0]
+            boxes[:,3] = (boxes[:,3] * -1) + shape[0]
+
+        newboxes = np.copy(boxes)
+        # newboxes[:,0] = np.min(boxes[:,0:3:2],axis=1)
+        newboxes[:,1] = np.min(boxes[:,1:4:2],axis=1)
+        # newboxes[:,2] = np.max(boxes[:,0:3:2],axis=1)
+        newboxes[:,3] = np.max(boxes[:,1:4:2],axis=1)
+        boxes = np.array(newboxes,dtype=np.int64)
+
+        return image, boxes.tolist()
+
+class random_y_flip:
+    def __init__(self, rate=.5):
+        self.rate = rate
+
+    def __call__(self, image, boxes):
+        """
+        FASTER RCNN ONLY
+
+        :param image:
+        :param boxes:
+        :return:
+        """
+
+        flip = np.random.uniform(0, 1, 1) > 0.5
+
+        shape = image.shape
+        boxes = np.array(boxes,dtype=np.int)
+
+        if flip:
+            image = np.copy(image[:,::-1,:])
+            boxes[:, 0] = (boxes[:, 0] * -1) + shape[1]
+            boxes[:, 2] = (boxes[:, 2] * -1) + shape[1]
+
+        newboxes = np.copy(boxes)
+        newboxes[:,0] = np.min(boxes[:,0:3:2],axis=1)
+        # newboxes[:,1] = np.min(boxes[:,1:4:2],axis=1)
+        newboxes[:,2] = np.max(boxes[:,0:3:2],axis=1)
+        # newboxes[:,3] = np.max(boxes[:,1:4:2],axis=1)
+        boxes = np.array(newboxes,dtype=np.int64)
+
+        return image, boxes.tolist()
+
+class random_resize:
+    def __init__(self, rate=.5, scale=(.8, 1.2)):
+        self.rate = rate
+        self.scale = scale
+
+    def __call__(self, image, boxes):
+        """
+        FASTER RCNN ONLY
+
+
+        :param image:
+        :param boxes:
+        :return:
+        """
+
+        scale = np.random.uniform(self.scale[0]*100, self.scale[1]*100, 1) / 100
+        shape = image.shape
+
+        new_shape = np.round(shape * scale)
+        new_shape[2] = shape[2]
+
+        image = transform.resize(image, new_shape)
+
+        boxes = np.array(boxes) * scale
+        boxes = np.round(boxes).round()
+        boxes = np.array(boxes, dtype=np.int64)
+
+        return image, boxes.tolist()
+
+
+class remove_channel:
+
+    def __init__(self, remaining_channel_index=[0,2,3]):
+        self.index_remain = remaining_channel_index
+
+    def __call__(self, image):
+        """
+        Assumes channels are at last dimmension of tensor!
+
+        :param image:
+        :return:
+        """
+
+        if image.ndim == 3:
+            image  = image[:,:,self.index_remain]
+        elif image.ndim == 4:
+            image  = image[:,:,:,self.index_remain]
+        elif image.ndim == 5:
+            image  = image[:,:,:,:,self.index_remain]
+
+        return image
+
+class clean_image:
+    """
+    Simple transform ensuring no nan values are passed to the model.
+
+    """
+
+    def __init__(self):
+        pass
+    
+    @joint_transform
+    def __call__(self, image, seed):
+        type = image.dtype
+        image[np.isnan(image)] = 0
+        image[np.isinf(image)] = 1
+
+        return image.astype(dtype=type)
+
+

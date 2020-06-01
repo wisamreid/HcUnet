@@ -1,4 +1,5 @@
 import torch
+import torchvision.ops
 import numpy as np
 import skimage.exposure
 import skimage.filters
@@ -15,8 +16,11 @@ import pickle
 import glob
 import ray
 import cv2
+from torchvision import datasets, models, transforms
+import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import mask
+
 
 def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     """
@@ -366,3 +370,166 @@ def segment_mask(mask):
                     :] = part[3]
 
     return distance, unique_mask
+
+
+def predict_hair_cell_locations(image, model, candidate_list = None, initial_coords=(0,0)):
+    """
+    Takes in an image in torch spec from the dataloader for unet and performs the 2D search for hair cells on each
+    z plane, removes duplicates and spits back a list of hair cell locations, row identities, and probablilities
+
+    Steps:
+    process image ->
+    load model ->
+    loop through each slice ->
+    compile list of dicts ->
+    for each dict add a cell candidate to a master list ->
+    if a close cell candidate has a higher probability, replace old candidate with new one ->
+    return lists of master cell candidtates
+
+
+    :param image:
+    :param model:
+    :return:
+    """
+    # image *= 0.5
+    # image += 0.5
+    # tt = [transforms.ToTensor(),
+    #       transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+    #
+    # model = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
+    #                                                  progress=True,
+    #                                                  num_classes=5,
+    #                                                  pretrained_backbone=True,
+    #                                                  box_detections_per_img=500)
+    #
+    # model.load_state_dict(torch.load('./Model_Files/good_shit_8_BIG.pth'))
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # model.to(device)
+    # image.float().to(device)
+    # model.eval()
+    print(' ')
+    with torch.no_grad():
+        for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
+
+            image_z_slice = image[:,:,:,:,z]
+            predicted_cell_locations = model(image_z_slice)
+            predicted_cell_locations = predicted_cell_locations[0]# list of dicts (batch size) with each dict contaiing 'boxes' 'labels' 'scores'
+
+            for name in predicted_cell_locations:
+                predicted_cell_locations[name] = predicted_cell_locations[name].cpu()
+
+            if not candidate_list:
+                candidate_list = predicted_cell_locations
+            else:
+                candidate_list = _add_cell_candidates(candidate_list, predicted_cell_locations, initial_coords=initial_coords) # Two dicts will get merged into one!
+
+    return candidate_list
+
+
+def _add_cell_candidates(candidate_list: dict, candidate_new: dict, initial_coords=(0, 0)):
+    """
+    Works when use nms... Im dumb
+
+    Takes in a dict of current candidates and a dict of new candidates. From new candidates, adds
+    :param candidate_list:
+    :param candidate_new:
+    :return:
+    """
+
+    # min_dist = 50
+    iou_max = 0.10
+
+    candidate_list['boxes'] = torch.cat((candidate_list['boxes'], candidate_new['boxes']))
+    candidate_list['scores'] = torch.cat((candidate_list['scores'], candidate_new['scores']))
+    candidate_list['labels'] = torch.cat((candidate_list['labels'], candidate_new['labels']))
+
+    keep = torchvision.ops.nms(boxes=candidate_list['boxes'],
+                               scores=candidate_list['scores'],
+                               iou_threshold=iou_max)
+
+
+    candidate_list['boxes'] = candidate_list['boxes'][keep, :]
+    candidate_list['scores'] = candidate_list['scores'][keep]
+    candidate_list['labels'] = candidate_list['labels'][keep]
+
+
+
+    #We gotta adjust boxes so that its with propper chunk offset
+
+    candidate_list['boxes'][:, [0,2]] += initial_coords[0]
+    candidate_list['boxes'][:, [1,3]] += initial_coords[1]
+
+    return candidate_list
+
+def imshow(inp):
+    """Imshow for Tensor."""
+    inp = inp.numpy().transpose((1, 2, 0))
+    mean = np.array([0.5, 0.5, 0.5])
+    std = np.array([0.5, 0.5, 0.5])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp)
+    plt.pause(0.001)  # pause a bit so that plots are updated
+
+
+def show_box_pred(image, output,thr=.90):
+
+    c = ['nul','r','b','y','w']
+
+    boxes = output[0]['boxes'].detach().cpu().numpy().tolist()
+    labels = output[0]['labels'].detach().cpu().numpy().tolist()
+    scores = output[0]['scores'].detach().cpu().numpy().tolist()
+    image = image.cpu()
+
+    # x1, y1, x2, y2
+    inp = image.numpy().transpose((1, 2, 0))
+    mean = np.array([0.5, 0.5, 0.5])
+    std = np.array([0.5, 0.5, 0.5])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp,origin='lower')
+    plt.tight_layout()
+
+    for i, box in enumerate(boxes):
+
+        if scores[i] < thr:
+            continue
+
+        x1 = box[0]
+        y1 = box[1]
+        x2 = box[2]
+        y2 = box[3]
+
+        plt.plot([x1,x2],[y2,y2],c[labels[i]],lw=0.5)
+        plt.plot([x1,x2],[y1,y1],c[labels[i]], lw=0.5)
+        plt.plot([x1,x1],[y1,y2],c[labels[i]], lw=0.5)
+        plt.plot([x2,x2],[y1,y2],c[labels[i]], lw=0.5)
+
+    plt.savefig('test.png',dp=1000)
+    plt.show()
+
+
+def show_box_pred_simple(image, boxes):
+
+    c = ['nul','r','b','y','w']
+
+    # x1, y1, x2, y2
+
+
+    plt.imshow(image,origin='lower')
+    plt.tight_layout()
+
+    for i, box in enumerate(boxes):
+
+        x1 = box[0]
+        y1 = box[1]
+        x2 = box[2]
+        y2 = box[3]
+
+        plt.plot([x1,x2],[y2,y2],'r', lw=0.5)
+        plt.plot([x1,x2],[y1,y1],'r', lw=0.5)
+        plt.plot([x1,x1],[y1,y2],'r', lw=0.5)
+        plt.plot([x2,x2],[y1,y2],'r', lw=0.5)
+
+    plt.savefig('test.png',dp=1000)
+    plt.show()

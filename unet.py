@@ -76,7 +76,7 @@ class unet_constructor(nn.Module):
             'max_pool_kernel': max_pool_kernel,
             'upsample_stride': upsample_stride,
             'dilation': dilation,
-            'groups':groups
+            'groups': groups
                                     }
 
         self.down_steps = []
@@ -232,7 +232,7 @@ class Down(nn.Module):
 
         self.batch1 = conv_functions[3](out_channels)
         self.batch2 = conv_functions[3](out_channels)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.relu(self.batch1(self.conv1(x)))
@@ -279,7 +279,7 @@ class Up(nn.Module):
 
         self.batch1 = conv_functions[3](out_channels)
         self.batch2 = conv_functions[3](out_channels)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, y):
         x = self.up_conv(x)

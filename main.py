@@ -24,7 +24,7 @@ from skimage.morphology import skeletonize
 import scipy.ndimage
 import pickle
 import time
-
+from torchvision import datasets, models, transforms
 
 path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 
@@ -32,16 +32,19 @@ transforms = [
               t.to_float(),
               t.reshape(),
               t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]),
+              t.to_tensor(),
               ]
-
+print('Loading Image:  ',end='')
 image = io.imread(path)
+print('Done')
 
 if torch.cuda.is_available():
     device = 'cuda:0'
 else:
     device = 'cpu'
+print('Initalizing Unet:  ',end='')
 
-test = GUnet(image_dimensions=3,
+unet= GUnet(image_dimensions=3,
              in_channels=4,
              out_channels=1,
              feature_sizes=[16,32,64,128],
@@ -52,13 +55,28 @@ test = GUnet(image_dimensions=3,
              dilation=1,
              groups=2).to(device)
 
-test.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/May14_chris-MS-7C37_2.unet')
+unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/May14_chris-MS-7C37_2.unet')
 test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
-test.to(device)
-test.eval()
+unet.to(device)
+unet.eval()
+print('Done')
 
-y_ind = np.linspace(0, image.shape[1], 3).astype(np.int16)
-x_ind = np.linspace(0, image.shape[2], 3).astype(np.int16)
+print('Initalizing FasterRCNN:  ', end='')
+faster_rcnn = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
+                                                       progress=True,
+                                                       num_classes=5,
+                                                       pretrained_backbone=True,
+                                                       box_detections_per_img=500)
+
+faster_rcnn.load_state_dict(torch.load('best_fasterrcnn.pth'))
+faster_rcnn.to(device)
+faster_rcnn.eval()
+print('Done')
+
+num_chunks = 20
+
+y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
+x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
 
 base = './maskfiles/'
 newfolder = time.strftime('%y%m%d%H%M')
@@ -71,19 +89,29 @@ for i, y in enumerate(y_ind):
 
         im_slice = image[:, y_ind[i-1]:y, x_ind[j-1]:x, :]
 
-        for t in transforms:
-            im_slice = t(im_slice)
+        for tr in transforms:
+            im_slice = tr(im_slice)
 
-        a = mask.Part(utils.predict_mask(test, im_slice, device).numpy(), (x_ind[j-1], y_ind[i-1]))
+        #Convert to a 3 channel image
+        im_slice_frcnn = im_slice[:,[0,2,3],:,:,:]
+        #
+        print(f'Generating list of cell candidates for chunk {x,y}:  ', end='')
+
+        # cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+        # print(f'Done {len(cell_candidate_list["scores"])}')
+        #
+        # utils.show_box_pred(im_slice_frcnn[0,:,:,:,5], [cell_candidate_list])
+
+        a = mask.Part(utils.predict_mask(unet, im_slice, device).numpy(), (x_ind[j-1], y_ind[i-1]))
 
         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 image = 0
 
 
-mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
-
+# mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+# io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+#
 
 
 

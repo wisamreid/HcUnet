@@ -27,8 +27,10 @@ def cross_entropy_loss(pred, mask, pwl, weight='worst_z'):
     l = cel(pred.float(), mask.float())
     loss = (l*(pwl+1))
     if weight == 'worst_z':
-        scaling = torch.linspace(1, 2, pred.shape[-1]) ** 2
-        loss = loss.sum(dim=-1).sort() * scaling
+        scaling = torch.linspace(1, 2, pred.shape[4]) ** 2
+        loss, _ = torch.sort(loss.sum(dim=[0,1,2,3]))
+        loss *= scaling.to(loss.device)
+        loss /= (pred.shape[2]*pred.shape[3])
 
     return loss.mean()
 
@@ -63,6 +65,12 @@ def random_cross_entropy(pred, mask, pwl, weight, size):
     else:
         raise IndexError(f'Unexpected number of predicted mask dimmnsions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimensions: {pred_shape}')
+    if size <= 1:
+        raise ValueError(f'Size should be greater than 1 not {size}')
+    if (mask==1).sum() == 0:
+        raise ValueError(f'No positive labels in the mask')
+    if (mask==0).sum() == 0:
+        raise ValueError(f'No negative labels in the mask')
 
     cel = nn.BCEWithLogitsLoss(reduction='none')
 
