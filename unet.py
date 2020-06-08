@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import glob
+import os
 import torch.nn.functional as F
 try:
     from utils import pad_image_with_reflections
@@ -136,9 +138,25 @@ class unet_constructor(nn.Module):
 
         return x
 
-    def save(self, filename):
+    def save(self, filename, hyperparameters=None):
         model = {'state_dict': self.state_dict(),
-                 'model_specifications': self.model_specification}
+                 'model_specifications': self.model_specification,
+                 'hyperparameters': hyperparameters}
+
+        python_files = {}
+
+        python_files_list= glob.glob('./**/*.py', recursive=True)
+        for f in glob.glob('./**/*.ipynb', recursive=True):
+            python_files_list.append(f)
+
+        for f in python_files_list:
+            file = open(f,'r')
+            python_files[f] = file.read()
+            file.close()
+
+        model['python_files'] = python_files
+        model['tree_structure'] = glob.glob('**/*', recursive=True)
+
         torch.save(model, filename)
         return None
 
@@ -168,7 +186,11 @@ class unet_constructor(nn.Module):
 
         self.load_state_dict(model['state_dict'])
         self.eval()
-        return None
+        try:
+            return model['hyperparameters']
+        except KeyError:
+            return None
+
 
     def evaluate(self, image: torch.Tensor):
         if not isinstance(image, torch.Tensor):

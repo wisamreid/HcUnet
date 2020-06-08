@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-def cross_entropy_loss(pred, mask, pwl, weight='worst_z'):
+def cross_entropy_loss(pred, mask, pwl, weight=None):
     pred_shape = pred.shape
     if len(pred_shape) == 5:
         mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
@@ -15,14 +15,6 @@ def cross_entropy_loss(pred, mask, pwl, weight='worst_z'):
                          f' {len(pred_shape)} dimmensions: {pred_shape}')
 
 
-
-    # if mask.long().max() == 1:
-    #
-    # else:
-    #     cel = nn.CrossEntropyLoss(reduction='none', weight=torch.tensor([0,2.25]).float().cuda())
-    #     l = cel(pred, mask)
-
-    #cel = nn.BCEWithLogitsLoss(reduction='none', weight=torch.tensor([weight]).float().cuda())
     cel = nn.BCEWithLogitsLoss(reduction='none')
     l = cel(pred.float(), mask.float())
     loss = (l*(pwl+1))

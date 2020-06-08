@@ -37,34 +37,35 @@ def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
         if pad % 2 != 0:
             raise ValueError('Padding must be divisible by 2')
 
-    image_size = image.shape  # expect x,y,z,c
+    image_size = image.shape
     pad_size = np.array(pad_size)
 
-    left_pad = image.numpy()[pad_size[0]-1::-1, :, :, :]
+    left_pad = image.numpy()[:, :, pad_size[0]-1::-1, :, :]
     left_pad = torch.as_tensor(left_pad.copy())
-    right_pad = image.numpy()[-1:-pad_size[0]-1:-1, :, :, :]
+    right_pad = image.numpy()[:, :, -1:-pad_size[0]-1:-1, :, :]
     right_pad = torch.as_tensor(right_pad.copy())
-    image = torch.cat((left_pad, image, right_pad), dim=0)
+    image = torch.cat((left_pad, image, right_pad), dim=2)
+
     left_pad = 0
     right_pad = 0
 
-    bottom_pad = image.numpy()[:, pad_size[1]-1::-1, :, :]
+    bottom_pad = image.numpy()[:, :, :, pad_size[1]-1::-1, :]
     bottom_pad = torch.as_tensor(bottom_pad.copy())
-    top_pad = image.numpy()[:, -1:-pad_size[1]-1:-1, :, :]
+    top_pad = image.numpy()[:, :, :, -1:-pad_size[1]-1:-1, :]
     top_pad = torch.as_tensor(top_pad.copy())
-    image = torch.cat((bottom_pad, image, top_pad), dim=1)
+    image = torch.cat((bottom_pad, image, top_pad), dim=3)
     bottom_pad = 0
     top_pad = 0
 
-    bottom_pad = image.numpy()[ :, :, pad_size[2]-1::-1, :]
+    bottom_pad = image.numpy()[ :, :, :, :, pad_size[2]-1::-1]
     bottom_pad = torch.as_tensor(bottom_pad.copy())
-    top_pad = image.numpy()[:, :, -1:-pad_size[2]-1:-1, :]
+    top_pad = image.numpy()[:, :, :, :, -1:-pad_size[2]-1:-1]
     top_pad = torch.as_tensor(top_pad.copy())
 
-    return torch.cat((bottom_pad, image, top_pad), dim=2)
+    return torch.cat((bottom_pad, image, top_pad), dim=4)
 
 
-def predict_mask(model, image, device):
+def predict_mask(unet, faster_rcnn, image, device):
     """
     Takes in a model and an image and applies the model to all parts of the image.
 
@@ -83,10 +84,10 @@ def predict_mask(model, image, device):
     :return mask:
 
     """
-    PAD_SIZE = (76, 76, 6)
-    EVAL_IMAGE_SIZE = (500, 500, 20)
+    PAD_SIZE = (128, 128, 4)
+    EVAL_IMAGE_SIZE = (256, 256, 20)
 
-    mask = torch.zeros((1, 1, image.shape[0], image.shape[1], image.shape[2]), dtype=torch.bool)
+    mask = torch.ones((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
     im_shape = image.shape
 
     # inf and nan screw up model evaluation. Happens occasionally
@@ -97,20 +98,21 @@ def predict_mask(model, image, device):
     image = pad_image_with_reflections(torch.as_tensor(image), pad_size=PAD_SIZE)
 
     #  We now calculate the indicies for our image
-    x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], image.shape[0])
-    y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], image.shape[1])
-    z_ind = calculate_indexes(PAD_SIZE[2], EVAL_IMAGE_SIZE[2], im_shape[2], image.shape[2])
+    x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[2], image.shape[2])
+    y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[3], image.shape[3])
+    z_ind = calculate_indexes(PAD_SIZE[2], EVAL_IMAGE_SIZE[2], im_shape[4], image.shape[4])
 
     iterations = 0
     max_iter = (len(x_ind) * len(y_ind) * len(z_ind))-1
 
+    cell_candidates = None
     # Loop and apply unet
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             for k, z in enumerate(z_ind):
                 print(f'\r{iterations}/{max_iter} ', end=' ')
                 # t.to_tensor reshapes image to [B C X Y Z]!!!
-                padded_image_slice = t.to_tensor()(image[x[0]:x[1], y[0]:y[1]:, z[0]:z[1], :].numpy()).float()
+                padded_image_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z[0]:z[1]].float().to(device)
 
                 # Occasionally everything is just -1 in the whole mat. Skip for speed
                 if (padded_image_slice.float() != -1).sum() == 0:
@@ -118,12 +120,16 @@ def predict_mask(model, image, device):
                     continue
 
                 with torch.no_grad():
-                    valid_out = model(padded_image_slice.float().to(device))
+                    valid_out = unet(padded_image_slice)
+                    # cell_candidates = predict_hair_cell_locations(padded_image_slice, faster_rcnn, cell_candidates, (x[0], y[0]))
+
 
                 valid_out = valid_out[:,:,
                                      PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
                                      PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
                                      PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
+
+                print(f'OUT SHAPE: {valid_out.shape}', end=' ')
 
 
                 #do everthing in place to save memory
@@ -135,15 +141,21 @@ def predict_mask(model, image, device):
                 valid_out.pow_(-1)
 
                 valid_out.gt_(.5)  # Greater Than
-
-                mask[:, :, x[0]:x[0]+valid_out.shape[2],
-                           y[0]:y[0]+valid_out.shape[3],
-                           z[0]:z[0]+valid_out.shape[4]] = valid_out
+                try:
+                    mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
+                               y[0]:y[0]+EVAL_IMAGE_SIZE[1],
+                               z[0]:z[0]+EVAL_IMAGE_SIZE[2]] = valid_out
+                except IndexError:
+                    raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
 
                 iterations += 1
+    print(cell_candidates)
+    if cell_candidates is not None:
+        cell_candidates['boxes'][:, [0, 2]] -= PAD_SIZE[0]
+        cell_candidates['boxes'][:, [1, 3]] -= PAD_SIZE[1]
 
     print('\ndone!')
-    return mask
+    return mask, cell_candidates
 
 
 def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape):
@@ -163,7 +175,6 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
 
     :return: List of lists corresponding to the indexes
     """
-
     ind_list = torch.arange(pad_size, image_shape, eval_image_size)
     ind = []
     for i, z in enumerate(ind_list):
@@ -296,6 +307,7 @@ def reconstruct_mask(path):
         x2 = part.loc[0]+part.shape[2]
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
+        print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
         mask[:, :, x1:x2, y1:y2, :] = part.mask.astype(np.uint8)
 
     return mask
@@ -391,27 +403,11 @@ def predict_hair_cell_locations(image, model, candidate_list = None, initial_coo
     :param model:
     :return:
     """
-    # image *= 0.5
-    # image += 0.5
-    # tt = [transforms.ToTensor(),
-    #       transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
-    #
-    # model = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
-    #                                                  progress=True,
-    #                                                  num_classes=5,
-    #                                                  pretrained_backbone=True,
-    #                                                  box_detections_per_img=500)
-    #
-    # model.load_state_dict(torch.load('./Model_Files/good_shit_8_BIG.pth'))
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # model.to(device)
-    # image.float().to(device)
-    # model.eval()
-    print(' ')
+
     with torch.no_grad():
         for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
 
-            image_z_slice = image[:,:,:,:,z]
+            image_z_slice = image[:, [0, 2, 3], :, :, z]
             predicted_cell_locations = model(image_z_slice)
             predicted_cell_locations = predicted_cell_locations[0]# list of dicts (batch size) with each dict contaiing 'boxes' 'labels' 'scores'
 
@@ -435,10 +431,11 @@ def _add_cell_candidates(candidate_list: dict, candidate_new: dict, initial_coor
     :param candidate_new:
     :return:
     """
+    iou_max = 0.20
+    candidate_new['boxes'][:, [0, 2]] += initial_coords[1]
+    candidate_new['boxes'][:, [1, 3]] += initial_coords[0]
 
-    # min_dist = 50
-    iou_max = 0.10
-
+    # Add the two dicts together
     candidate_list['boxes'] = torch.cat((candidate_list['boxes'], candidate_new['boxes']))
     candidate_list['scores'] = torch.cat((candidate_list['scores'], candidate_new['scores']))
     candidate_list['labels'] = torch.cat((candidate_list['labels'], candidate_new['labels']))
@@ -447,19 +444,14 @@ def _add_cell_candidates(candidate_list: dict, candidate_new: dict, initial_coor
                                scores=candidate_list['scores'],
                                iou_threshold=iou_max)
 
-
     candidate_list['boxes'] = candidate_list['boxes'][keep, :]
     candidate_list['scores'] = candidate_list['scores'][keep]
     candidate_list['labels'] = candidate_list['labels'][keep]
 
-
-
     #We gotta adjust boxes so that its with propper chunk offset
 
-    candidate_list['boxes'][:, [0,2]] += initial_coords[0]
-    candidate_list['boxes'][:, [1,3]] += initial_coords[1]
-
     return candidate_list
+
 
 def imshow(inp):
     """Imshow for Tensor."""
@@ -483,11 +475,15 @@ def show_box_pred(image, output,thr=.90):
 
     # x1, y1, x2, y2
     inp = image.numpy().transpose((1, 2, 0))
-    mean = np.array([0.5, 0.5, 0.5])
-    std = np.array([0.5, 0.5, 0.5])
+    mean = 0.5 #np.array([0.5, 0.5, 0.5])
+    std = 0.5 #np.array([0.5, 0.5, 0.5])
     inp = std * inp + mean
     inp = np.clip(inp, 0, 1)
-    plt.imshow(inp,origin='lower')
+    if inp.shape[-1] == 1:
+        inp = inp[:,:,0]
+        plt.imshow(inp, origin='lower', cmap='Greys_r')
+    else:
+        plt.imshow(inp, origin='lower', cmap='Greys_r')
     plt.tight_layout()
 
     for i, box in enumerate(boxes):

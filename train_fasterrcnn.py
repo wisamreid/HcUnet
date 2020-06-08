@@ -25,7 +25,7 @@ model.train()
 model = model.to(device)
 
 
-data = dataloader.section(path='./Data/FasterRCNN_trainData',
+data = dataloader.section(path='./Data/FasterRCNN_trainData/WholeCell',
                           image_transforms=[t.to_float(),
                                             t.random_gamma((.8, 1.2)),
                                             t.random_intensity(),
