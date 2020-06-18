@@ -14,6 +14,8 @@ def cross_entropy_loss(pred, mask, pwl, weight=None):
         raise IndexError(f'Unexpected number of predicted mask dimmensions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimmensions: {pred_shape}')
 
+    # Hacky way to do this:
+    pwl[mask > .5] += 2
 
     cel = nn.BCEWithLogitsLoss(reduction='none')
     l = cel(pred.float(), mask.float())

@@ -6,12 +6,21 @@ from numba import njit
 
 class makePWL:
     def __call__(self, imagepath):
+        """
+        Pixel wize loss
+
+
+        :param imagepath:
+        :return:
+        """
         print(f'STARTING PIXEL WISE LOSS')
         mask = io.imread(imagepath)  # np.uint16
+        print(mask.dtype)
         ms = mask.shape
         bigmask = np.zeros((ms[0], ms[1] + 100, ms[2] + 100, ms[3]))
         bigmask[:, 50:ms[1] + 50, 50:ms[2] + 50, :] = mask
         background = bigmask[0, 0, 0, :]  # np.uint16
+        print(background)
 
         # for z in range(mono_bigmask.shape[0]):
         ##    for x in range(mono_bigmask.shape[1]):
@@ -29,7 +38,9 @@ class makePWL:
         pwl = np.zeros((bigmask.shape[0:-1:1]), dtype=np.float64)
         image_shape = bigmask.shape
         pwl = self.loop(pwl, bigmask, image_shape)
+        print(f'PWL MAX {pwl.max()}')
         pwl = pwl[:, 50:-50:1, 50:-50:1]
+        print(f'PWL MAX 2 {pwl.max()}')
         pwl_add = pwl + 1
 
         return pwl
@@ -75,7 +86,6 @@ class makePWL:
                                 lens.append(l)
 
                     if np.any(closest != np.array([0, 0, 0])) and np.any(nclosest != np.array([0, 0, 0])):
-                        # print(lens, w0 * np.exp(-1 * ((lens[0] + lens[1]) ** 2) / (2 * (sigma ** 2))))
                         return w0 * np.exp(-1 * ((lens[0] + lens[1]) ** 2) / (2 * (sigma ** 2)))
 
         return 0
