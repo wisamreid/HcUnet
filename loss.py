@@ -48,7 +48,7 @@ def dice_loss(pred, mask):
     return 1-loss
 
 
-def random_cross_entropy(pred, mask, pwl, weight, size):
+def random_cross_entropy(pred, mask, pwl, size):
     pred_shape = pred.shape
     if len(pred_shape) == 5:
         mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
@@ -62,23 +62,27 @@ def random_cross_entropy(pred, mask, pwl, weight, size):
     if size <= 1:
         raise ValueError(f'Size should be greater than 1 not {size}')
     if (mask==1).sum() == 0:
-        raise ValueError(f'No positive labels in the mask')
+        cel = nn.BCEWithLogitsLoss(reduction='none')
+        pred = pred.reshape(-1)
+        mask = mask.reshape(-1)
+        pwl = pwl.reshape(-1)
+        l = cel(pred.float(), mask.float())
     if (mask==0).sum() == 0:
         raise ValueError(f'No negative labels in the mask')
+    else:
+        cel = nn.BCEWithLogitsLoss(reduction='none')
 
-    cel = nn.BCEWithLogitsLoss(reduction='none')
+        pred = pred.reshape(-1)
+        mask = mask.reshape(-1)
+        pwl = pwl.reshape(-1)
 
-    pred = pred.reshape(-1)
-    mask = mask.reshape(-1)
-    pwl = pwl.reshape(-1)
+        pos_ind = torch.randint(low=0, high=int((mask==1).sum()), size=(1, size))[0, :]
+        neg_ind = torch.randint(low=0, high=int((mask==0).sum()), size=(1, size))[0, :]
 
-    pos_ind = torch.randint(low=0, high=int((mask==1).sum()), size=(1, size))[0, :]
-    neg_ind = torch.randint(low=0, high=int((mask==0).sum()), size=(1, size))[0, :]
+        pred = torch.cat([pred[mask==1][pos_ind], pred[mask==0][neg_ind]]).unsqueeze(0)
+        pwl = torch.cat([pwl[mask==1][pos_ind], pwl[mask==0][neg_ind]]).unsqueeze(0)
+        mask = torch.cat([mask[mask==1][pos_ind], mask[mask==0][neg_ind]]).unsqueeze(0)
 
-    pred = torch.cat([pred[mask==1][pos_ind], pred[mask==0][neg_ind]]).unsqueeze(0)
-    pwl = torch.cat([pwl[mask==1][pos_ind], pwl[mask==0][neg_ind]]).unsqueeze(0)
-    mask = torch.cat([mask[mask==1][pos_ind], mask[mask==0][neg_ind]]).unsqueeze(0)
-
-    l = cel(pred.float(), mask.float())
+        l = cel(pred.float(), mask.float())
 
     return (l*(pwl+1)).mean()
