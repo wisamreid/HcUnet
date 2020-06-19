@@ -59,6 +59,10 @@ def random_cross_entropy(pred, mask, pwl, size):
     else:
         raise IndexError(f'Unexpected number of predicted mask dimmnsions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimensions: {pred_shape}')
+
+    if (mask == 1).sum() < size:
+        size = (mask == 1).sum()
+
     if size <= 1:
         raise ValueError(f'Size should be greater than 1 not {size}')
     if (mask==1).sum() == 0:
