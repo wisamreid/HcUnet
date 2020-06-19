@@ -60,19 +60,22 @@ def random_cross_entropy(pred, mask, pwl, size):
         raise IndexError(f'Unexpected number of predicted mask dimmnsions. Expected 4 (2D) or 5 (3D) but got' +
                          f' {len(pred_shape)} dimensions: {pred_shape}')
 
+    if size <= 1:
+        raise ValueError(f'Size should be greater than 1 not {size}')
+
     if (mask == 1).sum() < size:
         size = (mask == 1).sum()
 
-    if size <= 1:
-        raise ValueError(f'Size should be greater than 1 not {size}')
-    if (mask==1).sum() == 0:
+    if (mask==0).sum() == 0:
+        raise ValueError(f'No negative labels in the mask')
+
+    elif (mask==1).sum() == 0:
         cel = nn.BCEWithLogitsLoss(reduction='none')
         pred = pred.reshape(-1)
         mask = mask.reshape(-1)
         pwl = pwl.reshape(-1)
         l = cel(pred.float(), mask.float())
-    if (mask==0).sum() == 0:
-        raise ValueError(f'No negative labels in the mask')
+
     else:
         cel = nn.BCEWithLogitsLoss(reduction='none')
 
