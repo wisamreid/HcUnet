@@ -26,7 +26,7 @@ import pickle
 import time
 from torchvision import datasets, models, transforms
 
-path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
+path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 
 transforms = [
               t.to_float(),
@@ -73,7 +73,7 @@ faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')
 
-num_chunks = 15
+num_chunks = 2
 
 y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
@@ -93,28 +93,27 @@ for i, y in enumerate(y_ind):
             im_slice = tr(im_slice)
 
         #Convert to a 3 channel image
-        im_slice_frcnn = im_slice[:,[0,2,3],:,:,:]
+        # im_slice_frcnn = im_slice[:,[0,2,3],:,:,:]
         #
-        print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
+        # print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
 
-        cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
-        print(f'Done {len(cell_candidate_list["scores"])}')
+        # cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+        # print(f'Done {len(cell_candidate_list["scores"])}')
         #
         pred_mask, cell_candidates = utils.predict_mask(unet, faster_rcnn, im_slice, device)
 
-        if cell_candidates is not None:
-            plt.figure(figsize=(20,20))
-            utils.show_box_pred(pred_mask[0,:,:,:,5], [cell_candidates], .85)
-            plt.savefig(f'chunk{i}_{j}.tif')
-            plt.show()
+        # if cell_candidates is not None:
+        #     plt.figure(figsize=(20,20))
+        #     utils.show_box_pred(pred_mask[0,:,:,:,5], [cell_candidates], .85)
+        #     plt.savefig(f'chunk{i}_{j}.tif')
+        #     plt.show()
 
         a = mask.Part(pred_mask.numpy(), (x_ind[j-1], y_ind[i-1]))
 
         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
+
 image = 0
-
-
 mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
 print('Done!')
 print('Saving Image...', end='')

@@ -24,8 +24,9 @@ import mask
 
 def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     """
-    Pads image according to Unet spe
+    Pads image according to Unet spec
     expect [B, C, X, Y, Z]
+    Adds pad size to each side of each dim. For example, if pad size is 10, then 10 px will be added on top, and on bottom.
 
     :param image:
     :param pad_size:
@@ -85,7 +86,7 @@ def predict_mask(unet, faster_rcnn, image, device):
 
     """
     PAD_SIZE = (128, 128, 4)
-    EVAL_IMAGE_SIZE = (256, 256, 20)
+    EVAL_IMAGE_SIZE = (400, 400, 20)
 
     mask = torch.ones((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
     im_shape = image.shape
@@ -101,6 +102,8 @@ def predict_mask(unet, faster_rcnn, image, device):
     x_ind = calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[2], image.shape[2])
     y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[3], image.shape[3])
     z_ind = calculate_indexes(PAD_SIZE[2], EVAL_IMAGE_SIZE[2], im_shape[4], image.shape[4])
+
+    print(x_ind)
 
     iterations = 0
     max_iter = (len(x_ind) * len(y_ind) * len(z_ind))-1
@@ -175,24 +178,63 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
 
     :return: List of lists corresponding to the indexes
     """
-    ind_list = torch.arange(pad_size, image_shape, eval_image_size)
+
+    try:
+        ind_list = torch.arange(0, image_shape, eval_image_size)
+        print(ind_list)
+        print(pad_size, image_shape, eval_image_size)
+    except RuntimeError:
+        raise RuntimeError(f'Calculate_indexes has incorrect values {pad_size} | {image_shape} | {eval_image_size}:\n'
+                           f'You are likely trying to have a chunk smaller than the set evaluation image size. '
+                           'Please decrease number of chunks.')
+
     ind = []
     for i, z in enumerate(ind_list):
         if i == 0:
             continue
-        z1 = int(ind_list[i-1]) - pad_size
-        z2 = int(z-1) + pad_size
-        ind.append([z1, z2])
+        z1 = int(ind_list[i-1])
+        z2 = int(z-1) + (2 * pad_size)
+        if z2 < padded_image_shape:
+            ind.append([z1, z2])
+        else:
+            break
     if not ind:  # Sometimes z is so small the first part doesnt work. Check if z_ind is empty, if it is do this!!!
         z1 = 0
         z2 = eval_image_size + pad_size * 2
         ind.append([z1, z2])
         ind.append([padded_image_shape - (eval_image_size+pad_size * 2), padded_image_shape])
-    else:
+    else:  # we always add at the end to ensure that the whole thing is covered.
         z1 = padded_image_shape - (eval_image_size + pad_size * 2)
         z2 = padded_image_shape - 1
         ind.append([z1, z2])
     return ind
+
+    # try:
+    #     ind_list = torch.arange(pad_size, image_shape, eval_image_size)
+    #     print(ind_list)
+    #     print(pad_size, image_shape, eval_image_size)
+    # except RuntimeError:
+    #     raise RuntimeError(f'Calculate_indexes has incorrect values {pad_size} | {image_shape} | {eval_image_size}:\n'
+    #                        f'You are likely trying to have a chunk smaller than the set evaluation image size. '
+    #                        'Please decrease number of chunks.')
+
+    # ind = []
+    # for i, z in enumerate(ind_list):
+    #     if i == 0:
+    #         continue
+    #     z1 = int(ind_list[i-1]) - pad_size
+    #     z2 = int(z-1) + pad_size
+    #     ind.append([z1, z2])
+    # if not ind:  # Sometimes z is so small the first part doesnt work. Check if z_ind is empty, if it is do this!!!
+    #     z1 = 0
+    #     z2 = eval_image_size + pad_size * 2
+    #     ind.append([z1, z2])
+    #     ind.append([padded_image_shape - (eval_image_size+pad_size * 2), padded_image_shape])
+    # else:  # we always add at the end to ensure that the whole thing is covered.
+    #     z1 = padded_image_shape - (eval_image_size + pad_size * 2)
+    #     z2 = padded_image_shape - 1
+    #     ind.append([z1, z2])
+    # return ind
 
 
 def get_cochlear_length(image, calibration, diagnostics=False):
