@@ -22,11 +22,12 @@ import skimage.filters
 from scipy import interpolate
 from skimage.morphology import skeletonize
 import scipy.ndimage
+import ray
 import pickle
 import time
 from torchvision import datasets, models, transforms
 
-path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
+path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 
 transforms = [
               t.to_float(),
@@ -55,7 +56,8 @@ unet= GUnet(image_dimensions=3,
              dilation=1,
              groups=2).to(device)
 
-unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
+# unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
+unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun23_chris-MS-7C37_1.unet')
 test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 unet.to(device)
 unet.eval()
@@ -73,7 +75,7 @@ faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')
 
-num_chunks = 2
+num_chunks = 3
 
 y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
@@ -115,6 +117,9 @@ for i, y in enumerate(y_ind):
 
 image = 0
 mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+# ray.init()
+# segment = utils.segment_mask(mask)
+
 print('Done!')
 print('Saving Image...', end='')
 io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))

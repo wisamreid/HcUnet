@@ -103,8 +103,6 @@ def predict_mask(unet, faster_rcnn, image, device):
     y_ind = calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[3], image.shape[3])
     z_ind = calculate_indexes(PAD_SIZE[2], EVAL_IMAGE_SIZE[2], im_shape[4], image.shape[4])
 
-    print(x_ind)
-
     iterations = 0
     max_iter = (len(x_ind) * len(y_ind) * len(z_ind))-1
 
@@ -124,8 +122,7 @@ def predict_mask(unet, faster_rcnn, image, device):
 
                 with torch.no_grad():
                     valid_out = unet(padded_image_slice)
-                    # cell_candidates = predict_hair_cell_locations(padded_image_slice, faster_rcnn, cell_candidates, (x[0], y[0]))
-
+                    #  cell_candidates = predict_hair_cell_locations(padded_image_slice, faster_rcnn, cell_candidates, (x[0], y[0]))
 
                 valid_out = valid_out[:,:,
                                      PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
@@ -134,8 +131,7 @@ def predict_mask(unet, faster_rcnn, image, device):
 
                 print(f'OUT SHAPE: {valid_out.shape}', end=' ')
 
-
-                #do everthing in place to save memory
+                # Do everything in place to save memory
                 # Do the sigmoid in place manually
                 # 1/ (1+exp(-x))
                 valid_out.mul_(-1)
@@ -181,13 +177,10 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
 
     try:
         ind_list = torch.arange(0, image_shape, eval_image_size)
-        print(ind_list)
-        print(pad_size, image_shape, eval_image_size)
     except RuntimeError:
         raise RuntimeError(f'Calculate_indexes has incorrect values {pad_size} | {image_shape} | {eval_image_size}:\n'
                            f'You are likely trying to have a chunk smaller than the set evaluation image size. '
                            'Please decrease number of chunks.')
-
     ind = []
     for i, z in enumerate(ind_list):
         if i == 0:
@@ -208,33 +201,6 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
         z2 = padded_image_shape - 1
         ind.append([z1, z2])
     return ind
-
-    # try:
-    #     ind_list = torch.arange(pad_size, image_shape, eval_image_size)
-    #     print(ind_list)
-    #     print(pad_size, image_shape, eval_image_size)
-    # except RuntimeError:
-    #     raise RuntimeError(f'Calculate_indexes has incorrect values {pad_size} | {image_shape} | {eval_image_size}:\n'
-    #                        f'You are likely trying to have a chunk smaller than the set evaluation image size. '
-    #                        'Please decrease number of chunks.')
-
-    # ind = []
-    # for i, z in enumerate(ind_list):
-    #     if i == 0:
-    #         continue
-    #     z1 = int(ind_list[i-1]) - pad_size
-    #     z2 = int(z-1) + pad_size
-    #     ind.append([z1, z2])
-    # if not ind:  # Sometimes z is so small the first part doesnt work. Check if z_ind is empty, if it is do this!!!
-    #     z1 = 0
-    #     z2 = eval_image_size + pad_size * 2
-    #     ind.append([z1, z2])
-    #     ind.append([padded_image_shape - (eval_image_size+pad_size * 2), padded_image_shape])
-    # else:  # we always add at the end to ensure that the whole thing is covered.
-    #     z1 = padded_image_shape - (eval_image_size + pad_size * 2)
-    #     z2 = padded_image_shape - 1
-    #     ind.append([z1, z2])
-    # return ind
 
 
 def get_cochlear_length(image, calibration, diagnostics=False):
@@ -357,6 +323,7 @@ def reconstruct_mask(path):
 
 def segment_mask(mask):
 
+    # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
     PAD_SIZE = (10, 10, 0)
     EVAL_IMAGE_SIZE = (500, 500, mask.shape[-1])
 
@@ -371,10 +338,10 @@ def segment_mask(mask):
 
     @ray.remote
     def par_fun(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, mask_part):
-        if not mask_part.max(): # part should be a bool. Max would be True or False!
-            out = np.zeros((1, 1, EVAL_IMAGE_SIZE[0], EVAL_IMAGE_SIZE[1], mask_part.shape[-1]),dtype=np.float16)
+        if not mask_part.max():  # part should be a bool. Max would be True or False!
+            out = np.zeros((1, 1, EVAL_IMAGE_SIZE[0], EVAL_IMAGE_SIZE[1], mask_part.shape[-1]), dtype=np.float16)
             return x, y, out, out.astype(np.int32)
-        # distance_part = scipy.ndimage.morphology.distance_transform_cdt(mask_part)
+
         distance_part = np.zeros(mask_part.shape)
         for i in range(distance_part.shape[-1]):
             distance_part[0,0,:,:,i] = cv2.distanceTransform(mask_part[0,0,:,:,i].astype(np.uint8), cv2.DIST_L2, 5)
@@ -390,6 +357,7 @@ def segment_mask(mask):
         local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, footprint=np.ones((1,1,10,10,10)),
                                                        labels=mask_part, threshold_abs=1)
         print(local_maximum.shape)
+        print(local_maximum.max())
         markers = scipy.ndimage.label(local_maximum)[0]
         labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part)
         return x, y, distance_part.astype(np.float16), labels
