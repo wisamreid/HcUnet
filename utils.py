@@ -88,7 +88,7 @@ def predict_mask(unet, faster_rcnn, image, device):
     PAD_SIZE = (128, 128, 4)
     EVAL_IMAGE_SIZE = (400, 400, 20)
 
-    mask = torch.ones((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
+    mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
     im_shape = image.shape
 
     # inf and nan screw up model evaluation. Happens occasionally
@@ -354,11 +354,19 @@ def segment_mask(mask):
                         PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],
                         PAD_SIZE[1]:EVAL_IMAGE_SIZE[1] + PAD_SIZE[1],
                         :]
-        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, footprint=np.ones((1,1,10,10,10)),
-                                                       labels=mask_part, threshold_abs=1)
-        print(local_maximum.shape)
-        print(local_maximum.max())
+
+        distance_part = distance_part[0,0,:,:,:]
+        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, min_distance=10)
+        local_maximum = np.expand_dims(local_maximum, axis=(0,1))
+        distance_part = np.expand_dims(distance_part, axis=(0,1))
+
+
+        # print(local_maximum.shape, distance_part.max(), distance_part.min(), local_maximum.max())
+
         markers = scipy.ndimage.label(local_maximum)[0]
+        print(markers.shape, distance_part.shape, mask_part.shape)
+
+        labels = []
         labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part)
         return x, y, distance_part.astype(np.float16), labels
 
@@ -385,6 +393,7 @@ def segment_mask(mask):
                  x[0]:x[0]+EVAL_IMAGE_SIZE[0],
                  y[0]:y[0]+EVAL_IMAGE_SIZE[1],
                  :] = part[2]
+
         unique_mask[:,
                     :,
                     x[0]:x[0]+EVAL_IMAGE_SIZE[0],

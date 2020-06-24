@@ -27,7 +27,7 @@ import pickle
 import time
 from torchvision import datasets, models, transforms
 
-path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
+path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 
 transforms = [
               t.to_float(),
@@ -75,7 +75,7 @@ faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')
 
-num_chunks = 3
+num_chunks = 2
 
 y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
@@ -117,12 +117,23 @@ for i, y in enumerate(y_ind):
 
 image = 0
 mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-# ray.init()
-# segment = utils.segment_mask(mask)
+ray.init()
+distance, unique_mask = utils.segment_mask(mask)
+
+# for i in range(distance.shape[-1]):
+#     fig, ax = plt.subplots(1,2)
+#     fig.set_size_inches(18.5, 10.5)
+#     ax[0].imshow(np.array(distance[0,0,:,:,i]/distance.max(),dtype=np.float))
+#     ax[1].imshow(np.array(unique_mask[0,0,:,:,i]/distance.max(),dtype=np.float))
+#
+#     plt.show()
+
+
 
 print('Done!')
 print('Saving Image...', end='')
 io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+io.imsave('test_unique_cell.tiff', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
 print('Done!')
 
 #
