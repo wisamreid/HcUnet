@@ -4,6 +4,7 @@ import loss
 import transforms as t
 import mask
 import os
+import segment
 import utils
 import torch
 import torch.nn as nn
@@ -36,6 +37,7 @@ transforms = [
               t.normalize([0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]),
               t.to_tensor(),
               ]
+
 print('Loading Image:  ',end='')
 image = io.imread(path)
 print('Done')
@@ -103,16 +105,16 @@ for i, y in enumerate(y_ind):
         # We want this to generate a list of all the cells in the chunk.
         # These cells will have centers that can be filled in with watershed later.
         print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
-        cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().cpu(), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+        cell_candidate_list = segment.predict_hair_cell_locations(im_slice_frcnn.float().cpu(), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
         print(f'Done. Predicted {len(cell_candidate_list["scores"])} cells.')
 
         # We now want to predict the segmentation mask for the chunk.
         print(f'Predicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
-        pred_mask, cell_candidates = utils.predict_mask(unet, faster_rcnn, im_slice, device)
+        pred_mask, cell_candidates = segment.predict_mask(unet, faster_rcnn, im_slice, device)
         print('Finished predicting segmentation mask.')
 
         # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
-        distance, unique_mask = utils.segment_mask(pred_mask.numpy())
+        distance, unique_mask = segment.segment_mask(pred_mask.numpy())
 
         if cell_candidates is not None:
             plt.figure(figsize=(20,20))
