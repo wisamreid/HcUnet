@@ -17,7 +17,7 @@ model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                              pretrained_backbone=True,
                                                              box_detections_per_img=500)
 
-model.load_state_dict(torch.load('best_fasterrcnn.pth'))
+model.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jun26_18:12.pth'))
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -25,25 +25,24 @@ model.train()
 model = model.to(device)
 
 
-data = dataloader.section(path='./Data/FasterRCNN_trainData/WholeCell',
+data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
                           image_transforms=[t.to_float(),
                                             t.random_gamma((.8, 1.2)),
                                             t.random_intensity(),
                                             t.spekle(0.00001),
                                             t.remove_channel(remaining_channel_index=[0, 2, 3]),
                                             t.normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-
                                             ],
                           joint_transforms=[
                                             t.random_x_flip(),
                                             t.random_y_flip(),
-                                            t.random_resize(scale=(.3, 4)),
+                                            # t.random_resize(scale=(.3, 4)),
                                             ]
                           )
 
 # Hyper Parameters
 num_epochs = 1
-lr = 1e-4
+lr = 1e-6
 gamma =  0.98
 
 # Random Initializations
@@ -57,6 +56,7 @@ previous_summed_loss = 0
 
 
 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
+# optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.965)
 
 TRAIN = True
@@ -68,14 +68,23 @@ if TRAIN:
         summed_loss = 0
         k = 1
         #    start_time = time.perf_counter()
-        for images, labels in data:
+        for ind, (images, labels) in enumerate(data):
+            # if ind != 8:
+            #     continue
+
             images = images.to(device)
             for i in labels:
                 labels[i] = labels[i].to(device)
 
+            if torch.isnan(images).sum() > 0:
+                raise ValueError('image is nan')
+            if torch.isinf(images).sum() > 0:
+                raise ValueError('image is inf')
+
             elapsed_time = time.perf_counter() - start_time
 
             optimizer.zero_grad()
+            
             outputs = model(images.float(), [labels])
 
             loss = None
@@ -117,15 +126,16 @@ if TRAIN:
 
     torch.save(model.state_dict(), 'best_1fasterrcnn.pth')
 
-images, _ = data[1]
+images, _ = data[2]
 model.eval()
 with torch.no_grad():
     a = model(images.to(device).float())
 
 u.show_box_pred(images.squeeze().float(), a)
 
-
+plt.figure()
 plt.plot(losses)
 plt.xlabel('Epoch')
 plt.ylabel('Losses')
+plt.show()
 

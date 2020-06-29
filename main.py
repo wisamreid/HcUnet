@@ -27,7 +27,8 @@ import pickle
 import time
 from torchvision import datasets, models, transforms
 
-path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
+path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
+ray.init()
 
 transforms = [
               t.to_float(),
@@ -57,7 +58,7 @@ unet= GUnet(image_dimensions=3,
              groups=2).to(device)
 
 # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
-unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun23_chris-MS-7C37_1.unet')
+unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun25_chris-MS-7C37_1.unet')
 test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
 unet.to(device)
 unet.eval()
@@ -71,11 +72,11 @@ faster_rcnn = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                        box_detections_per_img=500)
 
 faster_rcnn.load_state_dict(torch.load('best_fasterrcnn.pth'))
-faster_rcnn.to(device)
+faster_rcnn.to('cpu')
 faster_rcnn.eval()
 print('Done')
 
-num_chunks = 2
+num_chunks = 12
 
 y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
 x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
@@ -89,36 +90,59 @@ for i, y in enumerate(y_ind):
     for j, x in enumerate(x_ind):
         if j == 0: continue
 
+        # We take the chunk from the original image.
         im_slice = image[:, y_ind[i-1]:y, x_ind[j-1]:x, :]
 
+        # Apply only necessary transforms needed to turn it into a suitable image for pytorch.
         for tr in transforms:
             im_slice = tr(im_slice)
 
-        #Convert to a 3 channel image
-        # im_slice_frcnn = im_slice[:,[0,2,3],:,:,:]
-        #
-        # print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
+        # Convert to a 3 channel image for faster rcnn.
+        im_slice_frcnn = im_slice[:,[0,2,3],:,:,:]
 
-        # cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
-        # print(f'Done {len(cell_candidate_list["scores"])}')
-        #
+        # We want this to generate a list of all the cells in the chunk.
+        # These cells will have centers that can be filled in with watershed later.
+        print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
+        cell_candidate_list = utils.predict_hair_cell_locations(im_slice_frcnn.float().cpu(), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+        print(f'Done. Predicted {len(cell_candidate_list["scores"])} cells.')
+
+        # We now want to predict the segmentation mask for the chunk.
+        print(f'Predicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
         pred_mask, cell_candidates = utils.predict_mask(unet, faster_rcnn, im_slice, device)
+        print('Finished predicting segmentation mask.')
 
-        # if cell_candidates is not None:
-        #     plt.figure(figsize=(20,20))
-        #     utils.show_box_pred(pred_mask[0,:,:,:,5], [cell_candidates], .85)
-        #     plt.savefig(f'chunk{i}_{j}.tif')
-        #     plt.show()
+        # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
+        distance, unique_mask = utils.segment_mask(pred_mask.numpy())
 
-        a = mask.Part(pred_mask.numpy(), (x_ind[j-1], y_ind[i-1]))
+        if cell_candidates is not None:
+            plt.figure(figsize=(20,20))
+            utils.show_box_pred(pred_mask[0,:,:,:,5], [cell_candidates], .55)
+            plt.savefig(f'chunk{i}_{j}.tif')
+            plt.show()
+
+        a = mask.Part(pred_mask.numpy(), unique_mask.astype(np.uint16), (x_ind[j-1], y_ind[i-1]))
 
         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 
+
+        io.imsave(f'test_unique_cell_x{i}_y{j}.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
+
 image = 0
 mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-ray.init()
-distance, unique_mask = utils.segment_mask(mask)
+
+print('Done!')
+print('Saving Image...', end='')
+io.imsave('test_mask.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+print('Done!')
+
+mask = utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+
+print('Saving Segment Image...', end='')
+io.imsave('test_segment.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+print('Done!')
+
+#
 
 # for i in range(distance.shape[-1]):
 #     fig, ax = plt.subplots(1,2)
@@ -130,13 +154,6 @@ distance, unique_mask = utils.segment_mask(mask)
 
 
 
-print('Done!')
-print('Saving Image...', end='')
-io.imsave('test.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
-io.imsave('test_unique_cell.tiff', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
-print('Done!')
-
-#
 
 
 

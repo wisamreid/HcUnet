@@ -86,7 +86,7 @@ def predict_mask(unet, faster_rcnn, image, device):
 
     """
     PAD_SIZE = (128, 128, 4)
-    EVAL_IMAGE_SIZE = (400, 400, 20)
+    EVAL_IMAGE_SIZE = (300, 300, 20)
 
     mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
     im_shape = image.shape
@@ -129,8 +129,6 @@ def predict_mask(unet, faster_rcnn, image, device):
                                      PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
                                      PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
 
-                print(f'OUT SHAPE: {valid_out.shape}', end=' ')
-
                 # Do everything in place to save memory
                 # Do the sigmoid in place manually
                 # 1/ (1+exp(-x))
@@ -139,7 +137,7 @@ def predict_mask(unet, faster_rcnn, image, device):
                 valid_out.add_(1)
                 valid_out.pow_(-1)
 
-                valid_out.gt_(.5)  # Greater Than
+                valid_out.gt_(.75)  # Greater Than
                 try:
                     mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
                                y[0]:y[0]+EVAL_IMAGE_SIZE[1],
@@ -148,12 +146,11 @@ def predict_mask(unet, faster_rcnn, image, device):
                     raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
 
                 iterations += 1
-    print(cell_candidates)
+
     if cell_candidates is not None:
         cell_candidates['boxes'][:, [0, 2]] -= PAD_SIZE[0]
         cell_candidates['boxes'][:, [1, 3]] -= PAD_SIZE[1]
 
-    print('\ndone!')
     return mask, cell_candidates
 
 
@@ -320,6 +317,42 @@ def reconstruct_mask(path):
 
     return mask
 
+def reconstruct_segmented(path):
+    """
+    Assume we dont know anything about the number of pieces or the size of the image
+
+    :param path:
+    :return:
+    """
+    if path[-1] != '/':
+        path = path + '/'
+    files = glob.glob(path+'*.maskpart')
+    x_max = 0
+    y_max = 0
+
+    if not files:
+        raise FileExistsError('No Valid Part Files Found.')
+
+    #Infer the size of the base mask
+    for f in files:
+        part = pickle.load(open(f, 'rb'))
+        if part.loc[0] + part.shape[2] > x_max:
+            x_max = part.loc[0] + part.shape[2]
+        if part.loc[1] + part.shape[3] > y_max:
+            y_max = part.loc[1] + part.shape[3]
+
+    mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=np.uint16)
+
+    for f in files:
+        part = pickle.load(open(f, 'rb'))
+        x1 = part.loc[0]
+        x2 = part.loc[0]+part.shape[2]
+        y1 = part.loc[1]
+        y2 = part.loc[1]+part.shape[3]
+        print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
+        mask[:, :, x1:x2, y1:y2, :] = part.segmented_mask.astype(np.uint16)
+
+    return mask
 
 def segment_mask(mask):
 
@@ -343,6 +376,7 @@ def segment_mask(mask):
             return x, y, out, out.astype(np.int32)
 
         distance_part = np.zeros(mask_part.shape)
+        local_maximum = np.zeros(mask_part.shape)
         for i in range(distance_part.shape[-1]):
             distance_part[0,0,:,:,i] = cv2.distanceTransform(mask_part[0,0,:,:,i].astype(np.uint8), cv2.DIST_L2, 5)
 
@@ -356,7 +390,7 @@ def segment_mask(mask):
                         :]
 
         distance_part = distance_part[0,0,:,:,:]
-        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, min_distance=10)
+        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, min_distance=1)
         local_maximum = np.expand_dims(local_maximum, axis=(0,1))
         distance_part = np.expand_dims(distance_part, axis=(0,1))
 
@@ -364,10 +398,9 @@ def segment_mask(mask):
         # print(local_maximum.shape, distance_part.max(), distance_part.min(), local_maximum.max())
 
         markers = scipy.ndimage.label(local_maximum)[0]
-        print(markers.shape, distance_part.shape, mask_part.shape)
 
         labels = []
-        labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part)
+        labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part, watershed_line=True)
         return x, y, distance_part.astype(np.float16), labels
 
     # Loop and apply unet
