@@ -27,15 +27,18 @@ import pickle
 import time
 
 class HairCell:
-    def __init__(self, ):
-        self.image_coords = [] # [x,y,z,w,l,h]
-        self.center = [] # [x,y]
-        self.mask = [] # numpy array
-        self.gfp_stats = {'mean:': [], 'std': [], 'median': []} # green channel flattened array
+    def __init__(self, image_coords, center, image, mask, id):
+        self.image_coords = image_coords # [x1, y1, z1, x2, y2, z2]
+        self.center = center# [x,y,z] with respect to the slice maybe?
+        self.mask = mask # numpy array
 
         # self.frequency = []
         self.distance_from_apex = []
-        self.unique_id = []
+        self.unique_id = id
+
+        self.watershed()
+        self.gfp_stats = self._calculate_gfp_statistics(image, self.unique_mask) # green channel flattened array
+        print(self.gfp_stats)
 
     @property
     def frequency(self):
@@ -62,13 +65,25 @@ class HairCell:
         :param mask:  numpy array of same size of image, type bool, used as index's for the image
         :return: dict{'mean', 'median', 'std'}
         """
+        mask = mask > 0
+        gfp = image[0, 2, :, :, :][mask].float()
+        return {'mean:': gfp.mean(), 'std': gfp.std(), 'median': gfp.median()}
+
+    def watershed(self):
+        self.seed = np.zeros(self.mask.shape)
+        self.seed[0, 0, self.center[0], self.center[1], self.center[2]] = 1
+        self.seed = scipy.ndimage.label(self.seed)[0]
+
+        distance = np.zeros(self.mask.shape)
+        for i in range(self.mask.shape[-1]):
+            distance[0,0,:,:,i] = cv2.distanceTransform(self.mask[0, 0, :, :, i].astype(np.uint8), cv2.DIST_L2, 5)
+
+        labels = skimage.segmentation.watershed(-1*distance[0,0,:,:,:], self.seed[0,0,:,:,:], mask=self.mask[0,0,:,:,:])
+        self.unique_mask = labels
+
         return None
 
-    def watershed(self, mask):
 
-        distance = np.zeros(mask.shape)
-        for i in range(mask.shape[-1]):
-            distance[0,0,:,:,i] = cv2.distanceTransform(mask[0, 0, :, :, i].astype(np.uint8), cv2.DIST_L2, 5)
 
 
 

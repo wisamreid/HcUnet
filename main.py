@@ -116,12 +116,12 @@ for i, y in enumerate(y_ind):
 
         # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
         print(f'Assigning cell labels for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
-        unique_segmentation_mask = segment.generate_unique_segmentation_mask(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice)
+        unique_cells = segment.generate_unique_segmentation_mask(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice)
         print('Finished assigning cell labels.\n')
 
         if len(predicted_cell_candidate_list['scores']) > 0:
             plt.figure(figsize=(20,20))
-            utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .75)
+            utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .90)
             plt.savefig(f'chunk{i}_{j}.tif')
             plt.show()
 

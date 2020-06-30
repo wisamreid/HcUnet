@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import mask
 import utils
+from haircell import  HairCell
 
 
 def predict_segmentation_mask(unet, image, device):
@@ -145,7 +146,7 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
                     predicted_cell_locations['z_level'] = z_level
 
                     for name in predicted_cell_locations:
-                        predicted_cell_locations[name] = predicted_cell_locations[name].cpu()
+                        predicted_cell_locations[name] = predicted_cell_locations[name].float().cpu()
 
                     if not candidate_list:
                         candidate_list = predicted_cell_locations
@@ -184,13 +185,66 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
         base image that was segmented
     :return: list of cell objects
     """
+
     if len(predicted_cell_candidate_list['scores']) == 0:
         return None
 
-    for i, box_coords in enumerate(predicted_cell_candidate_list['boxes']):
-        print(box_coords)
+    unique_cell_id = 0
+    cells = []
+    for i, (y1, x1, y2, x2) in enumerate(predicted_cell_candidate_list['boxes']):
 
-    return None
+        center = [int((x2-x1)/2), int((y2-y1)/2), int(predicted_cell_candidate_list['z_level'][i])]
+        print(f'image shape, {image.shape}, x: {x1,x2}, y: {y1,y2}, center: {center}')
+
+        if x1 > image.shape[2]:
+            continue
+        elif y1 > image.shape[3]:
+            continue
+        if x2 > image.shape[2]:
+            x2 = torch.tensor(image.shape[2] - 1).float()
+        elif y2 > image.shape[3]:
+            y2 = torch.tensor(image.shape[3] - 1).float()
+
+        dx = [-10, 10]
+        dy = [-10, 10]
+
+        if (x1 + dx[0]) < 0:
+            dx[0] = x1
+        if (y1 + dy[0]) < 0:
+            dy[0] = y1
+        if (x2 + dx[1]) > image.shape[2]:
+            dx[1] = image.shape[2] - x2
+        if (y2 + dy[1]) > image.shape[3]:
+            dy[1] = image.shape[3] - y2
+
+
+
+        x1 = x1.clone()
+        x2 = x2.clone()
+        y1 = y1.clone()
+        y2 = y2.clone()
+
+        x1 += dx[0]
+        x2 += dx[1]
+        y1 += dy[0]
+        y2 += dy[1]
+
+        x1 = int(torch.round(x1.clone()))
+        x2 = int(torch.round(x2.clone()))
+        y1 = int(torch.round(y1.clone()))
+        y2 = int(torch.round(y2.clone()))
+
+        center[0] -= int(dx[0])
+        center[1] -= int(dy[0])
+        # print(center)
+
+        image_slice = image[:, :, x1:x2, y1:y2, :]
+        mask_slice = predicted_semantic_mask[:, :, x1:x2, y1:y2, :]
+
+        cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
+        unique_cell_id += 1
+
+    return cells
 
 
 def generate_unique_segmentation_mask_distance(mask):
