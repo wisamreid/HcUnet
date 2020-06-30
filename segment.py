@@ -23,9 +23,9 @@ import mask
 import utils
 
 
-def predict_mask(unet, faster_rcnn, image, device):
+def predict_segmentation_mask(unet, image, device):
     """
-    Takes in a model and an image and applies the model to all parts of the image.
+    Uses pretrained unet model to predict semantic segmentation of hair cells.
 
     ALGORITHM:
     Remove inf and nan ->
@@ -79,22 +79,22 @@ def predict_mask(unet, faster_rcnn, image, device):
 
                 with torch.no_grad():
                     valid_out = unet(padded_image_slice)
-                    #  cell_candidates = predict_hair_cell_locations(padded_image_slice, faster_rcnn, cell_candidates, (x[0], y[0]))
 
                 valid_out = valid_out[:,:,
                                      PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
                                      PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
                                      PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
 
-                # Do everything in place to save memory
-                # Do the sigmoid in place manually
+                # Perform an in place sigmoid function to save memory.
                 # 1/ (1+exp(-x))
                 valid_out.mul_(-1)
                 valid_out.exp_()
                 valid_out.add_(1)
                 valid_out.pow_(-1)
 
+                # Take pixels that are greater than 75% likely to be a cell.
                 valid_out.gt_(.75)  # Greater Than
+
                 try:
                     mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
                                y[0]:y[0]+EVAL_IMAGE_SIZE[1],
@@ -104,14 +104,10 @@ def predict_mask(unet, faster_rcnn, image, device):
 
                 iterations += 1
 
-    if cell_candidates is not None:
-        cell_candidates['boxes'][:, [0, 2]] -= PAD_SIZE[0]
-        cell_candidates['boxes'][:, [1, 3]] -= PAD_SIZE[1]
-
-    return mask, cell_candidates
+    return mask
 
 
-def predict_hair_cell_locations(image, model, candidate_list = None, initial_coords=(0,0)):
+def predict_cell_candidates(image, model, candidate_list = None, initial_coords=(0,0)):
     """
     Takes in an image in torch spec from the dataloader for unet and performs the 2D search for hair cells on each
     z plane, removes duplicates and spits back a list of hair cell locations, row identities, and probablilities
@@ -130,25 +126,81 @@ def predict_hair_cell_locations(image, model, candidate_list = None, initial_coo
     :param model:
     :return:
     """
+    PAD_SIZE = (24, 24, 0)
+    EVAL_IMAGE_SIZE = (500, 500, image.shape[-1])
+
+    im_shape = image.shape[2::]
+    x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], image.shape[2])
+    y_ind = utils.calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], image.shape[3])
 
     with torch.no_grad():
-        for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
+        for i, x in enumerate(x_ind):
+            for j, y in enumerate(y_ind):
+                for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
 
-            image_z_slice = image[:, [0, 2, 3], :, :, z]
-            predicted_cell_locations = model(image_z_slice)
-            predicted_cell_locations = predicted_cell_locations[0]# list of dicts (batch size) with each dict contaiing 'boxes' 'labels' 'scores'
+                    image_z_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z]
+                    predicted_cell_locations = model(image_z_slice)
+                    predicted_cell_locations = predicted_cell_locations[0]  # list of dicts (batch size) with each dict containing 'boxes' 'labels' 'scores'
+                    z_level = torch.ones(len(predicted_cell_locations['scores'])) * z
+                    predicted_cell_locations['z_level'] = z_level
 
-            for name in predicted_cell_locations:
-                predicted_cell_locations[name] = predicted_cell_locations[name].cpu()
+                    for name in predicted_cell_locations:
+                        predicted_cell_locations[name] = predicted_cell_locations[name].cpu()
 
-            if not candidate_list:
-                candidate_list = predicted_cell_locations
-            else:
-                candidate_list = utils._add_cell_candidates(candidate_list, predicted_cell_locations, initial_coords=initial_coords) # Two dicts will get merged into one!
+                    if not candidate_list:
+                        candidate_list = predicted_cell_locations
+                    else:
+                        candidate_list = utils.merge_cell_candidates(candidate_list, predicted_cell_locations, initial_coords=(x[0], y[0])) # Two dicts will get merged into one!
+
+    # candidate_list['boxes'][:, [0, 2]] += initial_coords[1]
+    # candidate_list['boxes'][:, [1, 3]] += initial_coords[0]
 
     return candidate_list
 
-def segment_mask(mask):
+
+def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_candidate_list, image):
+    """
+    Takes in a dict of predicted cell candiates, and a 5D mask image. Assigns a unique label to every cell in the chunk.
+
+    S C R A T C H  P A D
+    Algorithm:
+    Save each hair cell as an object?
+    Run watershed on each object?
+    Save each object as an individual file maybe? <- slow af
+
+    Maybe each HC object just contains the necessary metadata to get the og image info,
+        only saves the mask
+        calculates and saves some critical statistics of the gfp signal?
+        calculates rough volume? (Helpful with trying to exclude outliers)
+
+    A S S U M P T I O N S
+    every cell is uniquely segmented and does not touch another cell. (bad assumption)
+
+    :param predicted_semantic_mask:
+        array bool with semantic segmentation results
+    :param predicted_cell_candidate_list:
+        dict of lists: {'boxes' 'labels' 'scores' 'centers'}
+    :param image:
+        base image that was segmented
+    :return: list of cell objects
+    """
+    if len(predicted_cell_candidate_list['scores']) == 0:
+        return None
+
+    for i, box_coords in enumerate(predicted_cell_candidate_list['boxes']):
+        print(box_coords)
+
+    return None
+
+
+def generate_unique_segmentation_mask_distance(mask):
+    """
+    DEPRECIATED
+
+    :param mask:
+    :return:
+    """
+    raise DeprecationWarning
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
     PAD_SIZE = (10, 10, 0)
