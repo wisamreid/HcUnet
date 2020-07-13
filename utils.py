@@ -216,7 +216,7 @@ def reconstruct_mask(path):
         if part.loc[1] + part.shape[3] > y_max:
             y_max = part.loc[1] + part.shape[3]
 
-    mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=np.uint8)
+    mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=part.dtype)
 
     for f in files:
         part = pickle.load(open(f, 'rb'))
@@ -225,7 +225,7 @@ def reconstruct_mask(path):
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
         print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
-        mask[:, :, x1:x2, y1:y2, :] = part.mask.astype(np.uint8)
+        mask[:, :, x1:x2, y1:y2, :] = part.mask.astype(part.dtype)
 
     return mask
 
@@ -254,7 +254,7 @@ def reconstruct_segmented(path):
         if part.loc[1] + part.shape[3] > y_max:
             y_max = part.loc[1] + part.shape[3]
 
-    mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=np.uint16)
+    mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=part.dtype)
 
     for f in files:
         part = pickle.load(open(f, 'rb'))
@@ -263,7 +263,7 @@ def reconstruct_segmented(path):
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
         print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
-        mask[:, :, x1:x2, y1:y2, :] = part.segmented_mask.astype(np.uint16)
+        mask[:, :, x1:x2, y1:y2, :] = part.segmented_mask.astype(part.dtype)
 
     return mask
 
@@ -317,7 +317,7 @@ def show_box_pred(image, output,thr=.90):
     c = ['nul','r','b','y','w']
 
     boxes = output[0]['boxes'].detach().cpu().numpy().tolist()
-    labels = output[0]['labels'].detach().cpu().numpy().tolist()
+    labels = output[0]['labels'].detach().cpu().int().numpy().tolist()
     scores = output[0]['scores'].detach().cpu().numpy().tolist()
     image = image.cpu()
 

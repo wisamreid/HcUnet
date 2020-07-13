@@ -23,6 +23,7 @@ import skimage.filters
 from scipy import interpolate
 from skimage.morphology import skeletonize
 import scipy.ndimage
+import scipy.stats
 import pickle
 import time
 
@@ -35,10 +36,12 @@ class HairCell:
         # self.frequency = []
         self.distance_from_apex = []
         self.unique_id = id
-
-        self.watershed()
-        self.gfp_stats = self._calculate_gfp_statistics(image, self.unique_mask) # green channel flattened array
-        print(self.gfp_stats)
+        if self.mask.sum() > 1:
+            self.watershed()
+            self.gfp_stats = self._calculate_gfp_statistics(image, self.unique_mask) # green channel flattened array
+        else:
+            self.unique_mask = torch.zeros(10)
+            self.gfp_stats  = {'mean': np.NaN, 'std': np.NaN, 'median': np.NaN}
 
     @property
     def frequency(self):
@@ -65,13 +68,24 @@ class HairCell:
         :param mask:  numpy array of same size of image, type bool, used as index's for the image
         :return: dict{'mean', 'median', 'std'}
         """
-        mask = mask > 0
-        gfp = image[0, 2, :, :, :][mask].float()
-        return {'mean:': gfp.mean(), 'std': gfp.std(), 'median': gfp.median()}
+        mask = torch.tensor(mask > 0)
+        gfp = (image[0, 1, :, :, :][mask].float() * 0.5) + 0.5
+        # 0:DAPI
+        # 1:GFP
+        # 2:MYO7a
+        # 3:Actin
+
+        if int(gfp.shape[0]) < 1:
+            gfp = torch.zeros(10)
+        # print(image[0,1,:,:,:].float().mean()*0.5 + 0.5, gfp.mean())
+        return {'mean': gfp.mean(), 'std': gfp.std(), 'median': gfp.median(), 'num_samples': gfp.shape}
 
     def watershed(self):
         self.seed = np.zeros(self.mask.shape)
-        self.seed[0, 0, self.center[0], self.center[1], self.center[2]] = 1
+        try:
+            self.seed[0, 0, self.center[0]-1, self.center[1]-1, self.center[2]-1] = 1
+        except IndexError:
+            print(self.seed.shape, self.center)
         self.seed = scipy.ndimage.label(self.seed)[0]
 
         distance = np.zeros(self.mask.shape)

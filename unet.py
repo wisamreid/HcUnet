@@ -294,10 +294,10 @@ class Up(nn.Module):
                                              stride=upsample_stride,
                                              padding=0)
             self.lin_up = False
-        elif conv_functions[1] == torch.nn.upsampling.Upsample:
+        elif conv_functions[1] == torch.nn.Upsample:
             self.lin_up = True
         else:
-            raise RuntimeError('fuck')
+            raise RuntimeError('fuck', conv_functions[1])
 
         self.batch1 = conv_functions[3](out_channels)
         self.batch2 = conv_functions[3](out_channels)

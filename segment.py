@@ -24,7 +24,7 @@ import utils
 from haircell import  HairCell
 
 
-def predict_segmentation_mask(unet, image, device):
+def predict_segmentation_mask(unet, image, device, use_probability_map = False):
     """
     Uses pretrained unet model to predict semantic segmentation of hair cells.
 
@@ -37,6 +37,9 @@ def predict_segmentation_mask(unet, image, device):
     construct full valid mask ->
     RETURN mask
 
+
+    BLUR PROBABILITY MAP???
+
     :param model: Trained Unet Model from unet.py
     :param image: torch.Tensor image with transforms pre applied!!! [1, 4, X, Y, Z]
     :param device: 'cuda' or 'cpu'
@@ -44,9 +47,9 @@ def predict_segmentation_mask(unet, image, device):
 
     """
     PAD_SIZE = (128, 128, 4)
-    EVAL_IMAGE_SIZE = (300, 300, 20)
+    EVAL_IMAGE_SIZE = (300, 300, 15)
 
-    mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.bool)
+    mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.float)
     im_shape = image.shape
 
     # inf and nan screw up model evaluation. Happens occasionally
@@ -94,7 +97,12 @@ def predict_segmentation_mask(unet, image, device):
                 valid_out.pow_(-1)
 
                 # Take pixels that are greater than 75% likely to be a cell.
-                valid_out.gt_(.75)  # Greater Than
+                if not use_probability_map:
+                    valid_out.gt_(.50)  # Greater Than
+                    if mask.dtype != torch.uint8:
+                        mask = mask.type(torch.uint8)
+
+                # print(valid_out.dtype, valid_out.max())
 
                 try:
                     mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
@@ -159,7 +167,7 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
     return candidate_list
 
 
-def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_candidate_list, image):
+def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_candidate_list, image,  rejection_probability_threshold = .95):
     """
     Takes in a dict of predicted cell candiates, and a 5D mask image. Assigns a unique label to every cell in the chunk.
 
@@ -194,7 +202,6 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
     for i, (y1, x1, y2, x2) in enumerate(predicted_cell_candidate_list['boxes']):
 
         center = [int((x2-x1)/2), int((y2-y1)/2), int(predicted_cell_candidate_list['z_level'][i])]
-        print(f'image shape, {image.shape}, x: {x1,x2}, y: {y1,y2}, center: {center}')
 
         if x1 > image.shape[2]:
             continue
@@ -204,6 +211,9 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
             x2 = torch.tensor(image.shape[2] - 1).float()
         elif y2 > image.shape[3]:
             y2 = torch.tensor(image.shape[3] - 1).float()
+
+        if predicted_cell_candidate_list['scores'][i] < rejection_probability_threshold:
+            continue
 
         dx = [-10, 10]
         dy = [-10, 10]
@@ -242,6 +252,7 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
         mask_slice = predicted_semantic_mask[:, :, x1:x2, y1:y2, :]
 
         cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
+
         unique_cell_id += 1
 
     return cells
@@ -279,6 +290,7 @@ def generate_unique_segmentation_mask_distance(mask):
         local_maximum = np.zeros(mask_part.shape)
         for i in range(distance_part.shape[-1]):
             distance_part[0,0,:,:,i] = cv2.distanceTransform(mask_part[0,0,:,:,i].astype(np.uint8), cv2.DIST_L2, 5)
+
 
         distance_part = distance_part[:, :,
                         PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],

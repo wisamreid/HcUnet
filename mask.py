@@ -10,8 +10,10 @@ class Part:
         self.is_nul = not mask.sum() > 0
         self.loc = np.array(loc)  # This should be the top left corner ind
         self.mask = mask
-        self.segmented_mask = segmented_mask
+        self.dtype = mask.dtype
+        # self.segmented_mask = segmented_mask
 
+        # unique_segmentation_mask.astype(np.uint16)
     @property
     def mask(self):
         if self.__mask is not None:
