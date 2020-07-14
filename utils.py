@@ -20,6 +20,7 @@ from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import mask
+from haircell import HairCell
 
 
 def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
@@ -377,3 +378,19 @@ def show_box_pred_simple(image, boxes):
 
     plt.savefig('test.png',dp=1000)
     plt.show()
+
+
+def construct_instance_mask(cell_list: list, mask):
+    unique_mask = torch.tensor(mask).type(torch.int)
+
+    for i,cell in enumerate(cell_list):
+        if cell.is_bad:
+            continue
+
+        index = cell.image_coords
+        cell_mask = cell.unique_mask * (i + 1)
+        cell_mask = torch.tensor(cell_mask).int()
+        print(index[2]-index[0], index[3]-index[1], unique_mask.shape, index, mask.shape)
+        unique_mask[0, 0, index[0]:index[2], index[1]:index[3], :][cell_mask > 0] = cell_mask[cell_mask > 0]
+
+    return unique_mask

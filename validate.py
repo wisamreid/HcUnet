@@ -77,11 +77,21 @@ for image, mask, pwl in data:
 
     predicted_semantic_mask = segment.predict_segmentation_mask(unet, image, device)
 
+    unique_cells_original = segment.generate_unique_segmentation_mask(mask.numpy(),
+                                                             predicted_cell_candidate_list, image)
+
+
     unique_cells = segment.generate_unique_segmentation_mask(predicted_semantic_mask.numpy(),
                                                              predicted_cell_candidate_list, image)
 
-    unique_cells_original = segment.generate_unique_segmentation_mask(mask.numpy(),
-                                                             predicted_cell_candidate_list, image)
+    # out = utils.construct_instance_mask(unique_cells_original, mask)
+    #
+    # plt.figure()
+    # plt.imshow(out[0,0,:,:,23])
+    # plt.show()
+    #
+    #
+    # break
 
 
     plt.figure()
@@ -93,25 +103,49 @@ for image, mask, pwl in data:
             continue
         if np.isnan(a.gfp_stats['mean']) or np.isnan(b.gfp_stats['mean']):
             continue
-        plt.plot(0, a.gfp_stats['mean'], 'k.', alpha=0.1)
-        plt.plot(1, b.gfp_stats['mean'], 'k.', alpha=0.1)
-        plt.plot([0, 1], [a.gfp_stats['mean'], b.gfp_stats['mean']], 'r-', alpha=0.1)
 
+
+    #     plt.plot(0, a.gfp_stats['mean'], 'k.', alpha=0.1)
+    #     plt.plot(1, b.gfp_stats['mean'], 'k.', alpha=0.1)
+    #     plt.plot([0, 1], [a.gfp_stats['mean'], b.gfp_stats['mean']], 'r-', alpha=0.1)
+    #
         a_all.append(a.gfp_stats['mean'])
         b_all.append(b.gfp_stats['mean'])
 
-    plt.plot(0, np.mean(np.array(a_all)), 'ko')
-    plt.plot(1, np.mean(np.array(b_all)), 'ko')
-    plt.plot([0, 1], [np.mean(np.array(a_all)), np.mean(np.array(b_all))], 'b-')
+    diff1 = np.array(b_all) - np.array(a_all)
 
+    plt.hist(diff1, bins=30, alpha=0.3)
+    plt.axvline(diff1.mean(), c='C0')
+    plt.axvline(diff1.mean()-diff1.std(), linestyle='--', c='C0' )
+    plt.axvline(diff1.mean()+diff1.std(), linestyle='--', c='C0' )
 
-    ax = plt.gca()
-    ax.set_xlim(-0.25, 1.25)
-    plt.xticks([0,1], ['Automatic Segmentation', 'Manual Segmentation'])
-    plt.ylabel('Mean GFP Pixel Intensity')
-    print(scipy.stats.ttest_rel(a_all, b_all))
-    plt.title(f'Paired T-Test pval: {scipy.stats.ttest_rel(a_all, b_all)[1]}')
+    b_all = np.array(b_all)
+    a_all = np.array(a_all)
+
+    np.random.shuffle(b_all)
+    np.random.shuffle(a_all)
+
+    diff2 = np.array(b_all) - np.array(a_all)
+
+    plt.axvline(diff2.mean(), c='C1')
+    plt.hist(diff2, bins=30, alpha=0.3)
+    plt.axvline(diff2.mean()-diff2.std(), linestyle='--', c='C1' )
+    plt.axvline(diff2.mean()+diff2.std(), linestyle='--', c='C1' )
     plt.show()
+
+    #
+    # plt.plot(0, np.mean(np.array(a_all)), 'ko')
+    # plt.plot(1, np.mean(np.array(b_all)), 'ko')
+    # plt.plot([0, 1], [np.mean(np.array(a_all)), np.mean(np.array(b_all))], 'b-')
+    #
+    #
+    # ax = plt.gca()
+    # ax.set_xlim(-0.25, 1.25)
+    # plt.xticks([0,1], ['Automatic Segmentation', 'Manual Segmentation'])
+    # plt.ylabel('Mean GFP Pixel Intensity')
+    # print(scipy.stats.ttest_rel(a_all, b_all))
+    # plt.title(f'Paired T-Test pval: {scipy.stats.ttest_rel(a_all, b_all)[1]}')
+    # plt.show()
 
 
     # if len(predicted_cell_candidate_list['scores']) > 0:

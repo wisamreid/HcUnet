@@ -1,4 +1,3 @@
-from unet import unet_constructor as GUnet
 import dataloader as dataloader
 import loss
 import transforms as t
@@ -31,16 +30,19 @@ class HairCell:
     def __init__(self, image_coords, center, image, mask, id):
         self.image_coords = image_coords # [x1, y1, z1, x2, y2, z2]
         self.center = center# [x,y,z] with respect to the slice maybe?
-        self.mask = mask # numpy array
-
+        self.mask = np.round(mask) # numpy array
+        self.unique_mask = []
         # self.frequency = []
         self.distance_from_apex = []
         self.unique_id = id
+        self.is_bad = False
+
         if self.mask.sum() > 1:
             self.watershed()
             self.gfp_stats = self._calculate_gfp_statistics(image, self.unique_mask) # green channel flattened array
         else:
             self.unique_mask = torch.zeros(10)
+            self.is_bad = True
             self.gfp_stats  = {'mean': np.NaN, 'std': np.NaN, 'median': np.NaN}
 
     @property
@@ -86,15 +88,20 @@ class HairCell:
             self.seed[0, 0, self.center[0]-1, self.center[1]-1, self.center[2]-1] = 1
         except IndexError:
             print(self.seed.shape, self.center)
+
         self.seed = scipy.ndimage.label(self.seed)[0]
 
         distance = np.zeros(self.mask.shape)
+
         for i in range(self.mask.shape[-1]):
             distance[0,0,:,:,i] = cv2.distanceTransform(self.mask[0, 0, :, :, i].astype(np.uint8), cv2.DIST_L2, 5)
 
-        labels = skimage.segmentation.watershed(-1*distance[0,0,:,:,:], self.seed[0,0,:,:,:], mask=self.mask[0,0,:,:,:])
+        labels = skimage.segmentation.watershed(-1*self.mask[0,0,:,:,:], self.seed[0,0,:,:,:], mask=self.mask[0,0,:,:,:])
         self.unique_mask = labels
 
+        # plt.imshow(labels[:,:,17])
+        # plt.show()
+        # raise ValueError
         return None
 
 
