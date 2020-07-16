@@ -6,6 +6,8 @@ import numexpr as ne
 import numpy as np
 from numba import njit
 import copy
+import glob
+import skimage.io as io
 
 
 
@@ -190,7 +192,6 @@ class random_affine:
         return out.round()
 
 
-
 class random_rotate:
     def __init__(self, angle=None):
         self.angle = angle
@@ -215,6 +216,7 @@ class random_rotate:
 
         return ndimage.rotate(image.astype(np.float), angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
 
+
 class normalize:
     def __init__(self, mean=[.5, .5, .5, .5], std=[.5, .5, .5, .5]):
         self.mean = mean
@@ -226,23 +228,16 @@ class normalize:
         shape = image.shape
         if image.ndim == 4:
             for channel in range(shape[-1]):
-                image[:,:,:,channel] += -self.mean[channel]
-                image[:,:,:,channel] /=  self.std[channel]
-                # image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
-        # if image.ndim == 3:
-        #     for channel in range(shape[-1]):
-        #         image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
+                image[:, :, :, channel] += -self.mean[channel]
+                image[:, :, :, channel] /=  self.std[channel]
         elif image.ndim == 3:
             for channel in range(shape[-1]):
-                image[:,:,channel] += -self.mean[channel]
-                image[:,:,channel] /=  self.std[channel]
-                # image[:, :, :, channel] = (image[:, :, :, channel] - self.mean[channel]) / self.std[channel]
-        # if image.ndim == 3:
-        #     for channel in range(shape[-1]):
-        #         image[:, :, channel] = (image[:, :, channel] - self.mean[channel]) / self.std[channel]
+                image[:, :, channel] += -self.mean[channel]
+                image[:, :, channel] /=  self.std[channel]
         else:
             raise ValueError(f'Wrong dims yo: {image.ndim} {image.shape}')
         return image
+
 
 class drop_channel:
     def __init__(self, chance):
@@ -258,6 +253,7 @@ class drop_channel:
             i = np.random.randint(0, image.shape[-1])
             image[:, :, :, i] = 0
         return image
+
 
 class random_intensity:
         def __init__(self, range=(.5,1.2), chance=.75):
@@ -347,6 +343,7 @@ class random_crop:
 
         return out
 
+
 # Cant be a @joint_transform because it needs info from one image to affect transforms of other
 class nul_crop:
 
@@ -379,7 +376,9 @@ class nul_crop:
 
         return out
 
+
 #  FROM FASTER_RCNN CODE
+
 
 class random_x_flip:
     def __init__(self, rate=.5):
@@ -412,6 +411,7 @@ class random_x_flip:
 
         return image, boxes.tolist()
 
+
 class random_y_flip:
     def __init__(self, rate=.5):
         self.rate = rate
@@ -443,6 +443,7 @@ class random_y_flip:
         boxes = np.array(newboxes,dtype=np.int64)
 
         return image, boxes.tolist()
+
 
 class random_resize:
     def __init__(self, rate=.5, scale=(.8, 1.2)):
@@ -487,6 +488,9 @@ class remove_channel:
         :return:
         """
 
+        if image.shape[-1] == len(self.index_remain):
+            return image
+
         if image.ndim == 3:
             image  = image[:,:,self.index_remain]
         elif image.ndim == 4:
@@ -495,6 +499,7 @@ class remove_channel:
             image  = image[:,:,:,:,self.index_remain]
 
         return image
+
 
 class clean_image:
     """
@@ -514,3 +519,79 @@ class clean_image:
         return image.astype(dtype=type)
 
 
+class add_junk_image:
+    """
+    Simple transform ensuring no nan values are passed to the model.
+
+    """
+
+    def __init__(self, path, channel_index=[0, 2, 3], junk_image_size=(100, 100), normalize=False):
+        """
+        Take in a path to images that are p junk. Make sure the images are
+        :param path:
+        :param channel_index: if the image has more channels than channel index, than it reduces down
+        """
+
+        self.index_remain = channel_index
+        self.path = path
+        self.files = glob.glob(self.path+'*.tif')
+        self.junk_image_size=junk_image_size
+        self.normalize = normalize
+        if normalize:
+            self.mean = normalize['mean']
+            self.std = normalize['std']
+
+
+    def __call__(self, image, boxes):
+        """
+        Loads a junk image and crops it randomly. Then adds it to image and removes boxes that overlap with
+        the added region.
+
+        :param image:
+        :param boxes:
+        :return:
+        """
+        i = np.random.randint(0,len(self.files))
+        junk_image = io.imread(self.files[i])
+        junk_image = to_float()(junk_image)
+
+        if not junk_image.shape[-1] == len(self.index_remain):
+            junk_image = junk_image[:, :, self.index_remain]
+
+        if self.normalize:
+            for i in range(junk_image.shape[-1]):
+                junk_image[:, :, i] -= self.mean[i]
+                junk_image[:, :, i] /= self.std[i]
+
+        print(junk_image.dtype, junk_image.max(), junk_image.min())
+
+        shape = junk_image.shape
+        x = np.random.randint(0, shape[0]-(self.junk_image_size[0]+1))
+        y = np.random.randint(0, shape[1]-(self.junk_image_size[1]+1))
+        junk_image = junk_image[x:x+self.junk_image_size[0], y:y+self.junk_image_size[1], :]
+
+        shape = image.shape
+        x = np.random.randint(0, shape[0] - (self.junk_image_size[0] + 1))
+        y = np.random.randint(0, shape[1] - (self.junk_image_size[1] + 1))
+        image[x:x + self.junk_image_size[0], y:y + self.junk_image_size[1], :] = junk_image
+
+        for i, box in enumerate(boxes):
+            box = np.array(box)
+            box_x = box[[0, 2]]
+            box_y = box[[1, 3]]
+
+            a = box_x < (x + self.junk_image_size[0])
+            b = box_x > x
+            c = np.logical_and(a, b)
+            if np.any(c):
+                boxes.pop(i)
+                continue
+
+            a = box_y < (y + self.junk_image_size[1])
+            b = box_y > y
+            c = np.logical_and(a, b)
+            if np.any(c):
+                boxes.pop(i)
+                continue
+
+        return image, boxes

@@ -24,6 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.train()
 model = model.to(device)
 
+norm = {'mean': [0.5, 0.5, 0.5], 'std': [0.5, 0.5, 0.5]}
 
 data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
                           image_transforms=[t.to_float(),
@@ -31,17 +32,20 @@ data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
                                             t.random_intensity(),
                                             t.spekle(0.00001),
                                             t.remove_channel(remaining_channel_index=[0, 2, 3]),
-                                            t.normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+                                            t.normalize(mean=norm['mean'], std=norm['std']),
                                             ],
                           joint_transforms=[
                                             t.random_x_flip(),
                                             t.random_y_flip(),
+                                            t.add_junk_image(path='Data/FasterRCNN_junkData/',
+                                                             junk_image_size=(100, 100),
+                                                             normalize=norm)
                                             # t.random_resize(scale=(.3, 4)),
                                             ]
                           )
 
 # Hyper Parameters
-num_epochs = 1
+num_epochs = 100
 lr = 1e-6
 gamma =  0.98
 
@@ -67,11 +71,7 @@ if TRAIN:
     for e in range(num_epochs):
         summed_loss = 0
         k = 1
-        #    start_time = time.perf_counter()
         for ind, (images, labels) in enumerate(data):
-            # if ind != 8:
-            #     continue
-
             images = images.to(device)
             for i in labels:
                 labels[i] = labels[i].to(device)
@@ -131,7 +131,7 @@ model.eval()
 with torch.no_grad():
     a = model(images.to(device).float())
 
-u.show_box_pred(images.squeeze().float(), a)
+u.show_box_pred(images.squeeze().float(), a, .75)
 
 plt.figure()
 plt.plot(losses)

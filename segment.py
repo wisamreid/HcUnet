@@ -154,7 +154,7 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
                     predicted_cell_locations['z_level'] = z_level
 
                     for name in predicted_cell_locations:
-                        predicted_cell_locations[name] = predicted_cell_locations[name].float().cpu()
+                        predicted_cell_locations[name] = predicted_cell_locations[name].float()
 
                     if not candidate_list:
                         candidate_list = predicted_cell_locations
@@ -258,91 +258,128 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
     return cells
 
 
-def generate_unique_segmentation_mask_distance(mask):
+def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, predicted_cell_candidate_list, image, rejection_probability_threshold=.95):
     """
-    DEPRECIATED
+    S C R A T C H  P A D
+
+    Read in mask
+    Read in list of cell candidates
+    make seed matrix first!!!
+    apply labels
+    chunk up that shit
+    Take only seeds from within the pad,
+    run watershed on batch of cells
+    take unique shindig and apply it to mask
+    assign cell object to each unique mask
+    ???
+    Profit
+
 
     :param mask:
+    :param predicted_cell_candidate_list:
+    :param image:
+    :param rejection_probability_threshold:
     :return:
     """
-    raise DeprecationWarning
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
-    PAD_SIZE = (10, 10, 0)
-    EVAL_IMAGE_SIZE = (500, 500, mask.shape[-1])
+    PAD_SIZE = (25, 25, 0)
+    EVAL_IMAGE_SIZE = (800, 800, predicted_semantic_mask.shape[-1])
+    num_dialate = 2
 
-    im_shape = mask.shape[2::]
-    x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], mask.shape[2])
-    y_ind = utils.calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], mask.shape[3])
+    im_shape = predicted_semantic_mask.shape[2::]
+    x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], predicted_semantic_mask.shape[2])
+    y_ind = utils.calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], predicted_semantic_mask.shape[3])
 
     iterations = 0
     max_iter = (len(x_ind) * len(y_ind))-1
-    distance = np.zeros(mask.shape, dtype=np.float16)
-    unique_mask = np.zeros(mask.shape, dtype=np.int32)
+    unique_mask = np.zeros(predicted_semantic_mask.shape, dtype=np.int32)
+    seed = np.zeros(unique_mask.shape, dtype=np.int)
 
-    @ray.remote
-    def par_fun(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, mask_part):
-        if not mask_part.max():  # part should be a bool. Max would be True or False!
-            out = np.zeros((1, 1, EVAL_IMAGE_SIZE[0], EVAL_IMAGE_SIZE[1], mask_part.shape[-1]), dtype=np.float16)
-            return x, y, out, out.astype(np.int32)
+    if len(predicted_cell_candidate_list['scores']) == 0:
+        return None
 
-        distance_part = np.zeros(mask_part.shape)
-        local_maximum = np.zeros(mask_part.shape)
-        for i in range(distance_part.shape[-1]):
-            distance_part[0,0,:,:,i] = cv2.distanceTransform(mask_part[0,0,:,:,i].astype(np.uint8), cv2.DIST_L2, 5)
+    unique_cell_id = 1
+    cells = []
+    for i, (y1, x1, y2, x2) in enumerate(predicted_cell_candidate_list['boxes']):
 
+        center = [int((x2-x1)/2), int((y2-y1)/2), int(predicted_cell_candidate_list['z_level'][i])]
 
-        distance_part = distance_part[:, :,
-                        PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],
-                        PAD_SIZE[1]:EVAL_IMAGE_SIZE[1] + PAD_SIZE[1],
-                        :]
-        mask_part = mask_part[:, :,
-                        PAD_SIZE[0]:EVAL_IMAGE_SIZE[0] + PAD_SIZE[0],
-                        PAD_SIZE[1]:EVAL_IMAGE_SIZE[1] + PAD_SIZE[1],
-                        :]
+        if x1 > image.shape[2]:
+            continue
+        elif y1 > image.shape[3]:
+            continue
+        if x2 > image.shape[2]:
+            x2 = torch.tensor(image.shape[2] - 1).float()
+        elif y2 > image.shape[3]:
+            y2 = torch.tensor(image.shape[3] - 1).float()
 
-        distance_part = distance_part[0,0,:,:,:]
-        local_maximum = skimage.feature.peak_local_max(distance_part, indices=False, min_distance=1)
-        local_maximum = np.expand_dims(local_maximum, axis=(0,1))
-        distance_part = np.expand_dims(distance_part, axis=(0,1))
+        if predicted_cell_candidate_list['scores'][i] < rejection_probability_threshold:
+            continue
 
+        dx = [-10, 10]
+        dy = [-10, 10]
 
-        # print(local_maximum.shape, distance_part.max(), distance_part.min(), local_maximum.max())
+        if (x1 + dx[0]) < 0:
+            dx[0] = x1
+        if (y1 + dy[0]) < 0:
+            dy[0] = y1
+        if (x2 + dx[1]) > image.shape[2]:
+            dx[1] = image.shape[2] - x2
+        if (y2 + dy[1]) > image.shape[3]:
+            dy[1] = image.shape[3] - y2
 
-        markers = scipy.ndimage.label(local_maximum)[0]
+        x1 = x1.clone()
+        x2 = x2.clone()
+        y1 = y1.clone()
+        y2 = y2.clone()
 
-        labels = []
-        labels = skimage.segmentation.watershed(-1*distance_part, markers, mask=mask_part, watershed_line=True)
-        return x, y, distance_part.astype(np.float16), labels
+        x1 += dx[0]
+        x2 += dx[1]
+        y1 += dy[0]
+        y2 += dy[1]
 
-    # Loop and apply unet
-    distance_part_list=[]
+        x1 = int(torch.round(x1.clone()))
+        x2 = int(torch.round(x2.clone()))
+        y1 = int(torch.round(y1.clone()))
+        y2 = int(torch.round(y2.clone()))
+
+        # center[0] -= int(dx[0])
+        # center[1] -= int(dy[0])
+        print(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2))
+
+        image_slice = image[:, :, x1:x2, y1:y2, :]
+        mask_slice = predicted_semantic_mask[:, :, x1:x2, y1:y2, :]
+        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), center[2]] = int(unique_cell_id)
+
+        cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
+
+        unique_cell_id += 1
+
+    print(unique_cell_id)
+    print(seed.max())
+
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
-            print(f'\r{iterations}/{max_iter} ', end=' ')
-            mask_slice = mask[:, :, x[0]:x[1], y[0]:y[1]:, :] == 1
+            print(f'\r{iterations}/{max_iter} {x} {y}', end=' ')
 
-            distance_part_list.append(par_fun.remote(x, y, PAD_SIZE, EVAL_IMAGE_SIZE, mask_slice))
+            mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
+
+            mask_slice_binary = mask_slice > 0.2
+
+            # for nul in range(num_dialate):
+            #     mask_slice_binary = skimage.morphology.binary_dilation(mask_slice_binary)
+
+            seed_slice = np.zeros(mask_slice.shape).astype(np.int)
+
+            seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], :] = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
+
+
+            labels = skimage.segmentation.watershed(mask_slice[0,0,:,:,:] * -1, seed_slice[0,0,:,:,:],mask=mask_slice_binary[0,0,:,:,:],watershed_line=True)
+            print(f' Watershed:{labels.max()}, SeedMax:{seed_slice.max()}, MaskSliceMax: {mask_slice.max()}, {seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :].max()}', end='\n')
+            unique_mask[0, 0, x[0]:x[1], y[0]:y[1]:, :][labels>0] = labels[labels>0]
+            # poop?
             iterations += 1
 
-    distance_part_list = ray.get(distance_part_list)
-    print('Finished Parallel Computation.')
 
-    while distance_part_list:
-        part = distance_part_list.pop(0)
-        x = part[0]
-        y = part[1]
-
-        distance[:,
-                 :,
-                 x[0]:x[0]+EVAL_IMAGE_SIZE[0],
-                 y[0]:y[0]+EVAL_IMAGE_SIZE[1],
-                 :] = part[2]
-
-        unique_mask[:,
-                    :,
-                    x[0]:x[0]+EVAL_IMAGE_SIZE[0],
-                    y[0]:y[0]+EVAL_IMAGE_SIZE[1],
-                    :] = part[3]
-
-    return distance, unique_mask
+    return unique_mask, seed
