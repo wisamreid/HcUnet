@@ -73,7 +73,7 @@ faster_rcnn = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                        pretrained_backbone=True,
                                                        box_detections_per_img=500)
 
-faster_rcnn.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jul15_15:36.pth'))
+faster_rcnn.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jul16_13:30.pth'))
 faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')
@@ -116,12 +116,13 @@ for i, y in enumerate(y_ind):
 
         # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
         print(f'Assigning cell labels for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
-        unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice, rejection_probability_threshold=.8)
+        unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice,
+                                                                                       rejection_probability_threshold=.5)
         print('Finished assigning cell labels.\n')
 
         if len(predicted_cell_candidate_list['scores']) > 0:
             plt.figure(figsize=(20,20))
-            utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .8)
+            utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .5)
             plt.savefig(f'chunk{i}_{j}.tif')
             plt.show()
 

@@ -563,7 +563,6 @@ class add_junk_image:
                 junk_image[:, :, i] -= self.mean[i]
                 junk_image[:, :, i] /= self.std[i]
 
-        print(junk_image.dtype, junk_image.max(), junk_image.min())
 
         shape = junk_image.shape
         x = np.random.randint(0, shape[0]-(self.junk_image_size[0]+1))

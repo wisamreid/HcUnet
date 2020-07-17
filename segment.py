@@ -284,7 +284,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
     PAD_SIZE = (25, 25, 0)
-    EVAL_IMAGE_SIZE = (800, 800, predicted_semantic_mask.shape[-1])
+    EVAL_IMAGE_SIZE = (200, 200, predicted_semantic_mask.shape[-1])
     num_dialate = 2
 
     im_shape = predicted_semantic_mask.shape[2::]
@@ -364,8 +364,12 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
             print(f'\r{iterations}/{max_iter} {x} {y}', end=' ')
 
             mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
+            distance = np.zeros(mask_slice.shape)
 
-            mask_slice_binary = mask_slice > 0.2
+            mask_slice_binary = mask_slice > 0.35
+
+            for z in range(distance.shape[-1]):
+                distance[0,0,:,:,i] = cv2.distanceTransform(mask_slice_binary[0, 0, :, :, i].astype(np.uint8), cv2.DIST_L2, 5)
 
             # for nul in range(num_dialate):
             #     mask_slice_binary = skimage.morphology.binary_dilation(mask_slice_binary)
@@ -375,7 +379,13 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
             seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], :] = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
 
 
-            labels = skimage.segmentation.watershed(mask_slice[0,0,:,:,:] * -1, seed_slice[0,0,:,:,:],mask=mask_slice_binary[0,0,:,:,:],watershed_line=True)
+            labels = skimage.segmentation.watershed(distance[0,0,:,:,:] * -1, seed_slice[0,0,:,:,:],
+                                                    mask=mask_slice_binary[0,0,:,:,:],
+                                                    watershed_line=True, compactness=2)
+
+
+
+
             print(f' Watershed:{labels.max()}, SeedMax:{seed_slice.max()}, MaskSliceMax: {mask_slice.max()}, {seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :].max()}', end='\n')
             unique_mask[0, 0, x[0]:x[1], y[0]:y[1]:, :][labels>0] = labels[labels>0]
             # poop?

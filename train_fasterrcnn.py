@@ -45,7 +45,7 @@ data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
                           )
 
 # Hyper Parameters
-num_epochs = 100
+num_epochs = 2000
 lr = 1e-6
 gamma =  0.98
 
@@ -126,12 +126,12 @@ if TRAIN:
 
     torch.save(model.state_dict(), 'best_1fasterrcnn.pth')
 
-images, _ = data[2]
+images, _ = data[19]
 model.eval()
 with torch.no_grad():
     a = model(images.to(device).float())
 
-u.show_box_pred(images.squeeze().float(), a, .75)
+u.show_box_pred(images.squeeze().float(), a, .4)
 
 plt.figure()
 plt.plot(losses)
