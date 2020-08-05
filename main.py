@@ -26,10 +26,12 @@ import scipy.ndimage
 import ray
 import pickle
 import time
+import logging
 from torchvision import datasets, models, transforms
 
-path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Jan 27 AAV2-PHPB m5.lif - TileScan m5 Merged.tif'
-ray.init()
+# path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
+path = '/media/chris/Padlock_3/ToAnalyze/Mar 6 AAV2-PHP.B-CMV11 m3.lif - m3 Stat Merged.tif'
+ray.init(logging_level=logging.CRITICAL)
 
 transforms = [
               t.to_float(),
@@ -77,7 +79,7 @@ faster_rcnn.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare
 faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')
-print(f'Starting Analysis: \n')
+print(f'Starting Analysis...')
 
 num_chunks = 3
 
@@ -87,6 +89,7 @@ x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
 base = './maskfiles/'
 newfolder = time.strftime('%y%m%d%H%M')
 os.mkdir(base+newfolder)
+all_cells = []
 
 for i, y in enumerate(y_ind):
     if i == 0: continue
@@ -105,20 +108,25 @@ for i, y in enumerate(y_ind):
 
         # We want this to generate a list of all the cells in the chunk.
         # These cells will have centers that can be filled in with watershed later.
-        print(f'Generating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
+        print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]: ', end='')
         predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
-        print(f'Done. Predicted {len(predicted_cell_candidate_list["scores"])} cells.')
+        print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]')
 
         # We now want to predict the semantic segmentation mask for the chunk.
-        print(f'Predicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
-        predicted_semantic_mask = segment.predict_segmentation_mask(unet, image_slice, device, use_probability_map=True)
-        print('Finished predicting segmentation mask.')
+        print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]:',end=' ')
+        predicted_semantic_mask = segment.predict_segmentation_mask(unet, image_slice, device, use_probability_map=False)
+        print('Done')
 
-        # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
-        print(f'Assigning cell labels for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]')
+        # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
+        print(f'\tAssigning cell labels for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]:', end=' ')
         unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice,
                                                                                        rejection_probability_threshold=.5)
-        print('Finished assigning cell labels.\n')
+        print('Done')
+
+        print(f'\tAssigning cell objects:', end=' ')
+        cell_list = segment.generate_cell_objects(image_slice, unique_mask)
+        all_cells = all_cells + cell_list
+        print('Done')
 
         if len(predicted_cell_candidate_list['scores']) > 0:
             plt.figure(figsize=(20,20))
@@ -137,22 +145,57 @@ for i, y in enumerate(y_ind):
         io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
         io.imsave(f'predicted_prob_map_{i}_{j}.tif', predicted_semantic_mask.numpy()[0,0,:,:,:].transpose((2, 1, 0)))
 
+        a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
+        pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
+        a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 
-#         a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
-#
-#         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
-#         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
-#         #
-#         #
-#         # io.imsave(f'test_unique_cell_x{i}_y{j}.tif', unique_segmentation_mask[0, 0, :, :, :].transpose((2, 1, 0)))
-#
-# image = 0
-# mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-#
-# print('Done!')
-# print('Saving Image...', end='')
-# io.imsave('test_mask.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
-# print('Done!')
+gfp = []
+for cell in all_cells:
+    print(cell.gfp_stats)
+
+    if not np.isnan(cell.gfp_stats['mean']):
+        gfp.append(cell.gfp_stats['mean'])
+
+print('Yeeting')
+gfp = np.array(gfp).flatten()
+plt.hist(gfp,bins=50)
+plt.axvline(gfp.mean(),c='r', linestyle='-')
+plt.xlabel('GFP Intensity')
+plt.ylabel('Occurrence (cells)')
+plt.title(path, fontdict={'fontsize': 8})
+plt.savefig('hist0.png')
+plt.show()
+print('Done')
+
+
+print('Reconstructing Mask...', end='')
+mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+print('Done!')
+print('Saving Image...', end='')
+io.imsave('test_mask.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+print('Done!')
+
+mask = mask[0,0,:,:,:].transpose((2, 1, 0))
+gfp = image[mask>0]
+gfp = np.array(gfp[:, 1]) / 2**16
+
+# plt.figure()
+# plt.hist(gfp, bins=100, range=[0.00000001, 1])
+# plt.axvline(gfp.mean(),c='r', linestyle='-')
+# plt.xlabel('GFP Intensity (excludes 0)')
+# plt.ylabel('Occurrence (px)')
+# plt.title(path, fontdict={'fontsize': 8})
+# plt.savefig('hist1.png')
+# plt.show()
+
+plt.figure()
+plt.hist(gfp, bins=100, range=[0, 1])
+plt.axvline(gfp.mean(),c='r', linestyle='-')
+plt.xlabel('GFP Intensity')
+plt.ylabel('Occurrence (px)')
+plt.title(path, fontdict={'fontsize': 8})
+plt.savefig('hist2.png')
+plt.show()
 
 # mask = utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
 #

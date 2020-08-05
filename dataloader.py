@@ -71,6 +71,7 @@ class stack(Dataset):
         # Expect files to contain two endings *.mask.tif
         # with first run of os.path.splitext we remove .tif
         # with second pass we remove .mask
+
         image = self.image[item]
         mask = self.mask[item]
         pwl = self.pwl[item]

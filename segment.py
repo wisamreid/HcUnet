@@ -8,20 +8,20 @@ import skimage.feature
 import skimage.segmentation
 import skimage
 import skimage.feature
-import scipy.ndimage
-import scipy.ndimage.morphology
-import transforms as t
-from scipy.interpolate import splprep, splev
-import pickle
-import glob
-import ray
 import cv2
-from torchvision import datasets, models, transforms
-import matplotlib.pyplot as plt
-from multiprocessing import Pool
-import mask
 import utils
-from haircell import  HairCell
+from haircell import HairCell
+# from torchvision import datasets, models, transforms
+# import matplotlib.pyplot as plt
+# from multiprocessing import Pool
+# import mask
+# import scipy.ndimage
+# import scipy.ndimage.morphology
+# import transforms as t
+# from scipy.interpolate import splprep, splev
+# import pickle
+# import glob
+# import ray
 
 
 def predict_segmentation_mask(unet, image, device, use_probability_map = False):
@@ -72,13 +72,15 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             for k, z in enumerate(z_ind):
-                print(f'\r{iterations}/{max_iter} ', end=' ')
+                print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='')
                 # t.to_tensor reshapes image to [B C X Y Z]!!!
                 padded_image_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z[0]:z[1]].float().to(device)
 
                 # Occasionally everything is just -1 in the whole mat. Skip for speed
                 if (padded_image_slice.float() != -1).sum() == 0:
                     iterations += 1
+                    for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
+                        print('\b \b', end='')
                     continue
 
                 with torch.no_grad():
@@ -99,10 +101,11 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
                 # Take pixels that are greater than 75% likely to be a cell.
                 if not use_probability_map:
                     valid_out.gt_(.50)  # Greater Than
+                    valid_out = valid_out.type(torch.uint8)
                     if mask.dtype != torch.uint8:
                         mask = mask.type(torch.uint8)
 
-                # print(valid_out.dtype, valid_out.max())
+                # print(valid_out.dtype, mask.dtype, valid_out.max())
 
                 try:
                     mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
@@ -112,6 +115,9 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
                     raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
 
                 iterations += 1
+                for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
+                    print('\b \b', end='')
+
 
     return mask
 
@@ -346,22 +352,22 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
         # center[0] -= int(dx[0])
         # center[1] -= int(dy[0])
-        print(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2))
+        # print(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2))
 
         image_slice = image[:, :, x1:x2, y1:y2, :]
         mask_slice = predicted_semantic_mask[:, :, x1:x2, y1:y2, :]
         seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), center[2]] = int(unique_cell_id)
 
-        cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
+        # cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
 
         unique_cell_id += 1
 
-    print(unique_cell_id)
-    print(seed.max())
+    # print(unique_cell_id)
+    # print(seed.max())
 
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
-            print(f'\r{iterations}/{max_iter} {x} {y}', end=' ')
+            print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='')
 
             mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
             distance = np.zeros(mask_slice.shape)
@@ -383,13 +389,48 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
                                                     mask=mask_slice_binary[0,0,:,:,:],
                                                     watershed_line=True, compactness=2)
 
-
-
-
-            print(f' Watershed:{labels.max()}, SeedMax:{seed_slice.max()}, MaskSliceMax: {mask_slice.max()}, {seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :].max()}', end='\n')
+            # print(f' Watershed:{labels.max()}, SeedMax:{seed_slice.max()}, MaskSliceMax: {mask_slice.max()}, {seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :].max()}', end='\n')
             unique_mask[0, 0, x[0]:x[1], y[0]:y[1]:, :][labels>0] = labels[labels>0]
             # poop?
             iterations += 1
+            for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
+                print('\b \b', end='')
 
 
     return unique_mask, seed
+
+
+def generate_cell_objects(image: torch.Tensor,  unique_mask):
+    """
+    Quick and dirty
+
+    :param image: [B,C,X,Y,Z] torch tensor
+    :param unique_mask: [X,Y,Z] numpy array
+    :return:
+    """
+
+    cell_ids = np.unique(unique_mask)
+    indicies = np.indices(unique_mask[0,0,:,:,:].shape) # Should be 3xMxN
+    cell_list = []
+
+    for id in cell_ids:
+        if id == 0:
+            continue
+
+        mask = (unique_mask == id)[0,0,:,:,:]
+        x_ind = indicies[0, :, :, :][mask]
+        y_ind = indicies[1, :, :, :][mask]
+        z_ind = indicies[2, :, :, :][mask]
+        x = (x_ind.min(), x_ind.max())
+        y = (y_ind.min(), y_ind.max())
+        z = (z_ind.min(), z_ind.max())
+
+        image_coords = [x[0], y[0], z[0], x[1], y[1], z[1]]
+        center = [(x[1]-x[0])/2, (y[1]-y[0])/2, (z[1]-z[0])/2]
+        image_slice = image[:, :, x[0]:x[1], y[0]:y[1], z[0]:z[1]]
+        mask = mask[x[0]:x[1], y[0]:y[1], z[0]:z[1]]
+
+        cell = HairCell(image_coords=image_coords, center=center, image=image_slice, mask=mask, id=id)
+        cell_list.append(cell)
+
+    return cell_list
