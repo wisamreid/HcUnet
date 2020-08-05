@@ -10,7 +10,12 @@ os.chdir(path)
 for image_loc in image_files:
     print(f'Analyzing: {image_loc}')
     foldername = os.path.splitext(image_loc)[0]
-    os.mkdir(foldername+'_cellBycell')
+    try:
+        os.mkdir(foldername+'_cellBycell')
+    except:
+        Warning('Folder Exists!')
+        continue
     os.chdir(foldername+'_cellBycell')
+    os.mkdir('maskfiles')
     analyze(image_loc)
     os.chdir('..')

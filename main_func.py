@@ -2,7 +2,7 @@ from unet import unet_constructor as GUnet
 import dataloader as dataloader
 import loss
 import transforms as t
-import mask
+import mask as m
 import os
 import segment
 import utils
@@ -148,8 +148,8 @@ def analyze(path=path):
             io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
             io.imsave(f'predicted_prob_map_{i}_{j}.tif', predicted_semantic_mask.numpy()[0,0,:,:,:].transpose((2, 1, 0)))
 
-            a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
-            pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
+            a = m.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
+            pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y_%m_%d_%H_%M") + str(time.monotonic_ns())+'.maskpart','wb'))
             a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 
     gfp = []
