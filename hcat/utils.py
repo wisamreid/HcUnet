@@ -10,17 +10,10 @@ import skimage
 import skimage.feature
 import scipy.ndimage
 import scipy.ndimage.morphology
-import transforms as t
 from scipy.interpolate import splprep, splev
 import pickle
 import glob
-import ray
-import cv2
-from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
-from multiprocessing import Pool
-import mask
-from haircell import HairCell
 
 
 def pad_image_with_reflections(image, pad_size=(30, 30, 6)):

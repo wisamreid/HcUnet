@@ -6,8 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 import xml.etree.ElementTree as ET
 import glob as glob
 import numpy as np
-import ray
-from PIL import Image, TiffImagePlugin
 
 try:
     import transforms as t

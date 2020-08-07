@@ -1,33 +1,16 @@
-from unet import unet_constructor as GUnet
-import dataloader as dataloader
-import loss
+from hcat.unet import unet_constructor as GUnet
 import transforms as t
-import mask as m
-import os
-import segment
-import utils
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.transforms as tt
-import numpy as np
-import matplotlib.pyplot as plt
-import pickle
+from hcat import mask as m, utils, segment
 import skimage.io as io
 import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import skimage.exposure
-import skimage.filters
-from scipy import interpolate
-from skimage.morphology import skeletonize
-import scipy.ndimage
 import ray
 import pickle
 import time
 import logging
-from torchvision import datasets, models, transforms
+from torchvision import models
 
 # path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 path = '/media/chris/Padlock_3/ToAnalyze/Mar 6 AAV2-PHP.B-CMV11 m3.lif - m3 Stat Merged.tif'
@@ -107,7 +90,7 @@ def analyze(path=path):
             image_slice_frcnn = image_slice[:,[0,2,3],:,:,:]
 
             print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]: ', end='')
-            predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+            predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j - 1], y_ind[i - 1]))
             print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]')
 
             print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:',end=' ')
@@ -127,7 +110,7 @@ def analyze(path=path):
             print(f'\tDisplaying sample z slices: ',end='')
             if len(predicted_cell_candidate_list['scores']) > 0:
                 plt.figure(figsize=(20,20))
-                utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .5)
+                utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 5], [predicted_cell_candidate_list], .5)
                 plt.savefig(f'chunk{i}_{j}.tif')
                 plt.show()
 

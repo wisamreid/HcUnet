@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 import glob
-import os
-import torch.nn.functional as F
+
 try:
-    from utils import pad_image_with_reflections
+    from hcat.utils import pad_image_with_reflections
 except ModuleNotFoundError:
     from HcUnet.utils import pad_image_with_reflections
 

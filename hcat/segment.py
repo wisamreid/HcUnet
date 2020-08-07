@@ -1,5 +1,4 @@
 import torch
-import torchvision.ops
 import numpy as np
 import skimage.exposure
 import skimage.filters
@@ -9,19 +8,8 @@ import skimage.segmentation
 import skimage
 import skimage.feature
 import cv2
-import utils
-from haircell import HairCell
-# from torchvision import datasets, models, transforms
-# import matplotlib.pyplot as plt
-# from multiprocessing import Pool
-# import mask
-# import scipy.ndimage
-# import scipy.ndimage.morphology
-# import transforms as t
-# from scipy.interpolate import splprep, splev
-# import pickle
-# import glob
-# import ray
+from hcat import utils
+from hcat.haircell import HairCell
 
 
 def predict_segmentation_mask(unet, image, device, use_probability_map = False):

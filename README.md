@@ -4,10 +4,9 @@
 ### Quickstart Guide
 Bare minimum code requirement for evaluation of an image. 
 ```python
-from unet import unet_constructor as Unet
+from hcat.unet import unet_constructor as Unet
 import torch.nn as nn
-import dataloader
-import transforms as t
+from hcat import dataloader, transforms as t
 
 
 data = dataloader.stack(path='./Data',
@@ -105,7 +104,7 @@ model.load(filename: str, to_cuda=True)
 
 ```python
 import dataloader
-import transforms
+from hcat import transforms
 data = dataloader.stack(path:str
                         joint_transforms:list
                        	image_transforms:list
@@ -139,7 +138,8 @@ The image, mask and pwl will first be augmented by transforms passed via the **j
 ### _fun_ pad_image_with_reflections
 
 ```python
-import utils
+
+from hcat import utils
 
 out = utils.pad_image_with_reflections(image, pad_size=(30, 30, 6)):
 ```

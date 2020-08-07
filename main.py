@@ -1,33 +1,15 @@
-from unet import unet_constructor as GUnet
-import dataloader as dataloader
-import loss
-import transforms as t
-import mask
-import os
-import segment
-import utils
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.transforms as tt
-import numpy as np
-import matplotlib.pyplot as plt
-import pickle
+from hcat.unet import unet_constructor as GUnet
+from hcat import mask, utils, transforms as t, segment
 import skimage.io as io
 import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import skimage.exposure
-import skimage.filters
-from scipy import interpolate
-from skimage.morphology import skeletonize
-import scipy.ndimage
 import ray
 import pickle
 import time
 import logging
-from torchvision import datasets, models, transforms
+from torchvision import models
 
 path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 # path = '/media/chris/Padlock_3/ToAnalyze/Jul 18 Control m1.lif - TileScan 1 Merged.tif'
@@ -109,7 +91,7 @@ for i, y in enumerate(y_ind):
         # We want this to generate a list of all the cells in the chunk.
         # These cells will have centers that can be filled in with watershed later.
         print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]: ', end='')
-        predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
+        predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j - 1], y_ind[i - 1]))
         print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]')
 
         # We now want to predict the semantic segmentation mask for the chunk.
@@ -130,7 +112,7 @@ for i, y in enumerate(y_ind):
 
         if len(predicted_cell_candidate_list['scores']) > 0:
             plt.figure(figsize=(20,20))
-            utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .5)
+            utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 5], [predicted_cell_candidate_list], .5)
             plt.savefig(f'chunk{i}_{j}.tif')
             plt.show()
 
@@ -145,7 +127,7 @@ for i, y in enumerate(y_ind):
         io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
         io.imsave(f'predicted_prob_map_{i}_{j}.tif', predicted_semantic_mask.numpy()[0,0,:,:,:].transpose((2, 1, 0)))
 
-        a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
+        a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j - 1], y_ind[i - 1]))
         pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 

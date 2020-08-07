@@ -3,13 +3,10 @@ from __future__ import division
 import torch
 import numpy as np
 import torchvision
-from torchvision import datasets, models, transforms
-import dataloader
+from hcat import dataloader, utils as u, transforms as t
 import matplotlib.pyplot as plt
-import utils as u
-import transforms as t
 import time
-import skimage.exposure
+
 # I think we need to have 5 classes, where 0 is background...
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                              progress=True,
@@ -26,7 +23,7 @@ model = model.to(device)
 
 norm = {'mean': [0.5, 0.5, 0.5], 'std': [0.5, 0.5, 0.5]}
 
-data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
+data = dataloader.section(path='../Data/FasterRCNN_trainData/Top',
                           image_transforms=[t.to_float(),
                                             t.random_gamma((.8, 1.2)),
                                             t.random_intensity(),
@@ -37,7 +34,7 @@ data = dataloader.section(path='./Data/FasterRCNN_trainData/Top',
                           joint_transforms=[
                                             t.random_x_flip(),
                                             t.random_y_flip(),
-                                            t.add_junk_image(path='Data/FasterRCNN_junkData/',
+                                            t.add_junk_image(path='../Data/FasterRCNN_junkData/',
                                                              junk_image_size=(100, 100),
                                                              normalize=norm)
                                             # t.random_resize(scale=(.3, 4)),
