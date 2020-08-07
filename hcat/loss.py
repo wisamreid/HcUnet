@@ -110,4 +110,3 @@ def dice(pred: torch.Tensor, mask: torch.Tensor):
     loss = (2 * (pred * mask).sum() + 1e-10) / ((pred + mask).sum() + 1e-10)
 
     return 1-loss
-
