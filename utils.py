@@ -225,7 +225,7 @@ def reconstruct_mask(path):
         x2 = part.loc[0]+part.shape[2]
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
-        print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
+        # print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
         mask[:, :, x1:x2, y1:y2, :] = part.mask.astype(part.dtype)
 
     return mask

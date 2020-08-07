@@ -29,8 +29,8 @@ import time
 import logging
 from torchvision import datasets, models, transforms
 
-# path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
-path = '/media/chris/Padlock_3/ToAnalyze/Mar 6 AAV2-PHP.B-CMV11 m3.lif - m3 Stat Merged.tif'
+path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
+# path = '/media/chris/Padlock_3/ToAnalyze/Jul 18 Control m1.lif - TileScan 1 Merged.tif'
 ray.init(logging_level=logging.CRITICAL)
 
 transforms = [
@@ -150,20 +150,45 @@ for i, y in enumerate(y_ind):
         a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
 
 gfp = []
+myo = []
+dapi = []
+actin = []
 for cell in all_cells:
-    print(cell.gfp_stats)
-
     if not np.isnan(cell.gfp_stats['mean']):
         gfp.append(cell.gfp_stats['mean'])
+        myo.append(cell.signal_stats['myo7a']['mean'])
+        dapi.append(cell.signal_stats['dapi']['mean'])
+        actin.append(cell.signal_stats['actin']['mean'])
 
 print('Yeeting')
 gfp = np.array(gfp).flatten()
-plt.hist(gfp,bins=50)
-plt.axvline(gfp.mean(),c='r', linestyle='-')
+myo = np.array(myo).flatten()
+dapi = np.array(dapi).flatten()
+actin = np.array(actin).flatten()
+
+plt.figure()
+plt.hist(gfp, bins=50)
+plt.axvline(gfp.mean(),c='red', linestyle='-')
 plt.xlabel('GFP Intensity')
 plt.ylabel('Occurrence (cells)')
 plt.title(path, fontdict={'fontsize': 8})
-plt.savefig('hist0.png')
+plt.savefig('hist0_gfp.png')
+plt.show()
+
+
+plt.figure()
+plt.hist(gfp, color='green', bins=50, alpha=0.6)
+plt.hist(myo, color='yellow', bins=50, alpha=0.6)
+plt.hist(dapi, color='blue', bins=50, alpha=0.6)
+plt.hist(actin, color='red', bins=50, alpha=0.6)
+plt.axvline(gfp.mean(),c='green', linestyle='-')
+plt.axvline(myo.mean(),c='yellow', linestyle='-')
+plt.axvline(dapi.mean(),c='blue', linestyle='-')
+plt.axvline(actin.mean(),c='red', linestyle='-')
+plt.xlabel('Signal Intensity')
+plt.ylabel('Occurrence (cells)')
+plt.title(path, fontdict={'fontsize': 8})
+plt.savefig('hist0_all_colors.png')
 plt.show()
 print('Done')
 

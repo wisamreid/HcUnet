@@ -84,7 +84,7 @@ def analyze(path=path):
     print('Done')
     print(f'Starting Analysis...')
 
-    num_chunks = 3
+    num_chunks = 4
 
     y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
     x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
@@ -99,29 +99,22 @@ def analyze(path=path):
         for j, x in enumerate(x_ind):
             if j == 0: continue
 
-            # We take the chunk from the original image.
             image_slice = image[:, y_ind[i-1]:y, x_ind[j-1]:x, :]
 
-            # Apply only necessary transforms needed to turn it into a suitable image for pytorch.
             for tr in transforms:
                 image_slice = tr(image_slice)
 
-            # Convert to a 3 channel image for faster rcnn.
             image_slice_frcnn = image_slice[:,[0,2,3],:,:,:]
 
-            # We want this to generate a list of all the cells in the chunk.
-            # These cells will have centers that can be filled in with watershed later.
-            print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]: ', end='')
+            print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]: ', end='')
             predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j-1], y_ind[i-1]))
             print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]')
 
-            # We now want to predict the semantic segmentation mask for the chunk.
-            print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]:',end=' ')
+            print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:',end=' ')
             predicted_semantic_mask = segment.predict_segmentation_mask(unet, image_slice, device, use_probability_map=False)
             print('Done')
 
-            # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
-            print(f'\tAssigning cell labels for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]:', end=' ')
+            print(f'\tAssigning cell labels for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:', end=' ')
             unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice,
                                                                                            rejection_probability_threshold=.5)
             print('Done')
@@ -131,6 +124,7 @@ def analyze(path=path):
             all_cells = all_cells + cell_list
             print('Done')
 
+            print(f'\tDisplaying sample z slices: ',end='')
             if len(predicted_cell_candidate_list['scores']) > 0:
                 plt.figure(figsize=(20,20))
                 utils.show_box_pred(predicted_semantic_mask[0,:,:,:,5], [predicted_cell_candidate_list], .5)
@@ -144,52 +138,80 @@ def analyze(path=path):
             plt.figure(figsize=(20,20))
             plt.imshow(predicted_semantic_mask.numpy()[0,0,:,:,8],)
             plt.show()
+            print('Done')
 
+            print(f'\tSaving chunk images: ',end='')
             io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0,0,:,:,:].transpose((2, 1, 0)))
             io.imsave(f'predicted_prob_map_{i}_{j}.tif', predicted_semantic_mask.numpy()[0,0,:,:,:].transpose((2, 1, 0)))
 
             a = m.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j-1], y_ind[i-1]))
-            pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y_%m_%d_%H_%M") + str(time.monotonic_ns())+'.maskpart','wb'))
+            pickle.dump(a, open(base+newfolder+'/'+time.strftime("%y_%m_%d_%H_%M_") + str(time.monotonic_ns())+'.maskpart','wb'))
             a = a.mask.astype(np.uint8)[0,0,:,:,:].transpose(2,1,0)
+            print('done')
+
+    print('Reconstructing Mask...', end='')
+    mask = utils.reconstruct_mask('./maskfiles/' + newfolder)
+    print('Done!')
+
+    print('Saving Mask Image...', end='')
+    io.imsave('test_mask.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
+    print('Done')
+
+    print('Generating Graphs: ', end='')
+    pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
 
     gfp = []
+    myo = []
+    dapi = []
+    actin = []
     for cell in all_cells:
-        print(cell.gfp_stats)
-
         if not np.isnan(cell.gfp_stats['mean']):
             gfp.append(cell.gfp_stats['mean'])
+            myo.append(cell.signal_stats['myo7a']['mean'])
+            dapi.append(cell.signal_stats['dapi']['mean'])
+            actin.append(cell.signal_stats['actin']['mean'])
 
-    print('Yeeting')
     gfp = np.array(gfp).flatten()
-    plt.hist(gfp,bins=50)
-    plt.axvline(gfp.mean(),c='r', linestyle='-')
+    myo = np.array(myo).flatten()
+    dapi = np.array(dapi).flatten()
+    actin = np.array(actin).flatten()
+
+    plt.figure()
+    plt.hist(gfp, bins=50)
+    plt.axvline(gfp.mean(), c='red', linestyle='-')
     plt.xlabel('GFP Intensity')
     plt.ylabel('Occurrence (cells)')
     plt.title(path, fontdict={'fontsize': 8})
-    plt.savefig('hist0.png')
+    plt.savefig('hist0_gfp.png')
     plt.show()
-    print('Done')
 
-
-    print('Reconstructing Mask...', end='')
-    mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-    print('Done!')
-    print('Saving Image...', end='')
-    io.imsave('test_mask.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
-    print('Done!')
+    plt.figure()
+    plt.hist(gfp, color='green', bins=50, alpha=0.6)
+    plt.hist(myo, color='yellow', bins=50, alpha=0.6)
+    plt.hist(dapi, color='blue', bins=50, alpha=0.6)
+    plt.hist(actin, color='red', bins=50, alpha=0.6)
+    plt.axvline(gfp.mean(), c='green', linestyle='-')
+    plt.axvline(myo.mean(), c='yellow', linestyle='-')
+    plt.axvline(dapi.mean(), c='blue', linestyle='-')
+    plt.axvline(actin.mean(), c='red', linestyle='-')
+    plt.xlabel('Signal Intensity')
+    plt.ylabel('Occurrence (cells)')
+    plt.title(path, fontdict={'fontsize': 8})
+    plt.savefig('hist0_all_colors.png')
+    plt.show()
 
     mask = mask[0,0,:,:,:].transpose((2, 1, 0))
     gfp = image[mask>0]
     gfp = np.array(gfp[:, 1]) / 2**16
 
-    # plt.figure()
-    # plt.hist(gfp, bins=100, range=[0.00000001, 1])
-    # plt.axvline(gfp.mean(),c='r', linestyle='-')
-    # plt.xlabel('GFP Intensity (excludes 0)')
-    # plt.ylabel('Occurrence (px)')
-    # plt.title(path, fontdict={'fontsize': 8})
-    # plt.savefig('hist1.png')
-    # plt.show()
+    plt.figure()
+    plt.hist(gfp, bins=100, range=[0.00000001, 1])
+    plt.axvline(gfp.mean(),c='r', linestyle='-')
+    plt.xlabel('GFP Intensity (excludes 0)')
+    plt.ylabel('Occurrence (px)')
+    plt.title(path, fontdict={'fontsize': 8})
+    plt.savefig('hist1.png')
+    plt.show()
 
     plt.figure()
     plt.hist(gfp, bins=100, range=[0, 1])
@@ -199,6 +221,8 @@ def analyze(path=path):
     plt.title(path, fontdict={'fontsize': 8})
     plt.savefig('hist2.png')
     plt.show()
+
+    print('Done')
 
 # mask = utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
 #

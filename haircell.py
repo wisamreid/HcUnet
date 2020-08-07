@@ -35,6 +35,15 @@ class HairCell:
         self.distance_from_apex = []
         self.unique_id = id
         self.is_bad = False
+        self.signal_stats = {}
+
+        for i, channel in enumerate(['dapi', 'gfp', 'myo7a', 'actin']):
+            if mask.sum() > 1:
+                self.signal_stats[channel] = self._calculate_gfp_statistics(image.float().numpy(), mask, i)  # green channel flattened array
+            else:
+                self.unique_mask = torch.zeros(10)
+                self.is_bad = True
+                self.signal_stats[channel] = {'mean': np.NaN, 'std': np.NaN, 'median': np.NaN}
 
         if mask.sum() > 1:
             self.gfp_stats = self._calculate_gfp_statistics(image.float().numpy(), mask) # green channel flattened array
@@ -60,7 +69,7 @@ class HairCell:
         raise NotImplementedError
 
     @staticmethod
-    def _calculate_gfp_statistics(image, mask):
+    def _calculate_gfp_statistics(image, mask, channel=1):
         """
         calculates mean, std, and median gfp intensity for the cell and stores the values in a dict.
 
@@ -69,7 +78,7 @@ class HairCell:
         :return: dict{'mean', 'median', 'std'}
         """
 
-        channel = 1
+        # channel = 1
         # 0:DAPI
         # 1:GFP
         # 2:MYO7a

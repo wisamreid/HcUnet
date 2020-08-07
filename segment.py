@@ -302,8 +302,12 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
     unique_mask = np.zeros(predicted_semantic_mask.shape, dtype=np.int32)
     seed = np.zeros(unique_mask.shape, dtype=np.int)
 
+    if predicted_cell_candidate_list['boxes'] is None:
+        Warning(f'No Predicted cells: {len(predicted_cell_candidate_list)}')
+        return unique_mask, seed
+
     if len(predicted_cell_candidate_list['scores']) == 0:
-        return None
+        return unique_mask, seed
 
     unique_cell_id = 1
     cells = []
