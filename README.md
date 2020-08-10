@@ -4,7 +4,7 @@
 ### Quickstart Guide
 Bare minimum code requirement for evaluation of an image. 
 ```python
-from hcat.unet import unet_constructor as Unet
+from hcat.unet import Unet_Constructor as Unet
 import torch.nn as nn
 from hcat import dataloader, transforms as t
 
@@ -37,9 +37,9 @@ out = model.forward(image.float())
 
 ## **unet.py**
 
-### _class_ **unet_constructor**
+### _class_ **Unet_Constructor**
 ```python
-model = unet_constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
+model = Unet_Constructor(conv_functions=(nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm3d),
                          in_channels=3,
                          out_channels=2,
                          feature_sizes=[32, 64, 128, 256, 512, 1024],

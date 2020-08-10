@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import glob
+from warnings import filterwarnings
 
 try:
     from hcat.utils import pad_image_with_reflections
@@ -8,7 +9,10 @@ except ModuleNotFoundError:
     from HcUnet.utils import pad_image_with_reflections
 
 
-class unet_constructor(nn.Module):
+filterwarnings("ignore", category=UserWarning)
+
+
+class Unet_Constructor(nn.Module):
     def __init__(self,
                  image_dimensions=2,
                  in_channels=3,
@@ -40,7 +44,7 @@ class unet_constructor(nn.Module):
         :param max_pool_kernel: Tuple: Kernel for torch.nn.MaxPool2/3d
         :param feature_sizes: List: List of integers describing the number of feature channels at each step of the U
         """
-        super(unet_constructor, self).__init__()
+        super(Unet_Constructor, self).__init__()
         if image_dimensions == 2:
             conv_functions = (nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.BatchNorm2d)
         elif image_dimensions == 3:
@@ -164,7 +168,7 @@ class unet_constructor(nn.Module):
         if torch.cuda.is_available() and to_cuda:
             device = 'cuda:0'
         else:
-            Warning('Cuda is not available, initalizing mdoel on the CPU')
+            Warning('Cuda is not available, initializing model on the CPU')
             device = 'cpu'
 
         model = torch.load(filename, map_location=device)
@@ -190,8 +194,8 @@ class unet_constructor(nn.Module):
         except KeyError:
             return None
 
-
     def evaluate(self, image: torch.Tensor):
+
         if not isinstance(image, torch.Tensor):
             raise ValueError(f'Expected image type of torch.Tensor, not {type(image)}')
         if image.shape[1] != self.model_specification['in_channels']:
@@ -271,7 +275,6 @@ class Up(nn.Module):
                  dilation: dict,
                  groups: dict,
                  ):
-
 
         super(Up, self).__init__()
         self.conv1 = conv_functions[0](in_channels,

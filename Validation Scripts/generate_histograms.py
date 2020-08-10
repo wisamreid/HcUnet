@@ -3,7 +3,7 @@ import transforms as t
 
 import numpy as np
 import matplotlib.pyplot as plt
-from hcat.unet import unet_constructor as GUnet
+from hcat.unet import Unet_Constructor as GUnet
 from hcat.loss import dice_loss
 import torch
 

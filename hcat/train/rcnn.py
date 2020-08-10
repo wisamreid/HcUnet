@@ -23,7 +23,7 @@ model = model.to(device)
 
 norm = {'mean': [0.5, 0.5, 0.5], 'std': [0.5, 0.5, 0.5]}
 
-data = dataloader.section(path='../Data/FasterRCNN_trainData/Top',
+data = dataloader.section(path='../../Data/FasterRCNN_trainData/Top',
                           image_transforms=[t.to_float(),
                                             t.random_gamma((.8, 1.2)),
                                             t.random_intensity(),
@@ -34,7 +34,7 @@ data = dataloader.section(path='../Data/FasterRCNN_trainData/Top',
                           joint_transforms=[
                                             t.random_x_flip(),
                                             t.random_y_flip(),
-                                            t.add_junk_image(path='../Data/FasterRCNN_junkData/',
+                                            t.add_junk_image(path='../../Data/FasterRCNN_junkData/',
                                                              junk_image_size=(100, 100),
                                                              normalize=norm)
                                             # t.random_resize(scale=(.3, 4)),
