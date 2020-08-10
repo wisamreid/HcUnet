@@ -1,37 +1,36 @@
 from __future__ import print_function, division
 import os
 import torch
-from skimage import io, transform
-from torch.utils.data import Dataset, DataLoader
-import xml.etree.ElementTree as ET
+from skimage import io
+from torch.utils.data import Dataset
+import xml.etree.ElementTree
 import glob as glob
 import numpy as np
-
-try:
-    import transforms as t
-except ModuleNotFoundError:
-    import HcUnet.transforms as t
-
+import hcat.transforms as t
 
 # Ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
 
 
-class stack(Dataset):
+class Stack(Dataset):
     """
-    Dataloader for unet
+    Dataloader for hcat.unet
+    Processes 3D images
 
+    Performs
     """
-
-    def __init__(self, path, image_transforms, joint_transforms, out_transforms=[t.to_tensor()]):
-        """
-        CSV File has a list of locations to other minibatch
-
-        :param csv_file:
-        :param transfrom:
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=None):
         """
 
+        :param path: str
+        :param image_transforms: list
+        :param joint_transforms: list
+        :param out_transforms: list
+        """
+
+        if out_transforms is None:
+            out_transforms = [t.to_tensor()]
 
         self.image_transforms = image_transforms
         self.out_transforms = out_transforms
@@ -42,18 +41,15 @@ class stack(Dataset):
         if len(self.files) == 0:
             raise FileExistsError('No Valid Mask Files Found')
 
-        self.image=[]
-        self.mask=[]
-        self.pwl=[]
+        self.image = []
+        self.mask = []
+        self.pwl = []
 
-        for file in self.files:
-            file_with_mask = os.path.splitext(file)[0]
-
+        for mask_path in self.files:
+            file_with_mask = os.path.splitext(mask_path)[0]
             image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
             pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
-            mask_path = file
             self.image.append(io.imread(image_data_path))
-
             try:
                 self.mask.append(io.imread(mask_path)[:, :, :, 0])
             except IndexError:
@@ -81,7 +77,6 @@ class stack(Dataset):
         pwl = np.expand_dims(pwl, axis=pwl.ndim)
 
         # May Turn to Torch
-
         for jt in self.joint_transforms:
             image, mask, pwl = jt([image, mask, pwl])
         for it in self.image_transforms:
@@ -92,29 +87,22 @@ class stack(Dataset):
         return image, mask, pwl
 
 
-def test_image(path, transforms):
-    image = io.imread(path)
-    print(image.dtype)
-    for t in transforms:
-        print(t)
-        image = t(image)
-    return image[0]
-
-
-class section(Dataset):
+class Section(Dataset):
     """
     Dataloader for 2d faster rcnn
-
-
     """
 
-    def __init__(self, path, image_transforms, joint_transforms, out_transforms=[t.to_tensor()]):
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=None):
         """
-        CSV File has a list of locations to other minibatch
 
-        :param csv_file:
-        :param transfrom:
+        :param path:
+        :param image_transforms:
+        :param joint_transforms:
+        :param out_transforms:
         """
+
+        if out_transforms is None:
+            out_transforms = [t.to_tensor()]
 
         self.image_transforms = image_transforms
         self.joint_transforms = joint_transforms
@@ -123,31 +111,34 @@ class section(Dataset):
         self.files = glob.glob(f'{path}{os.sep}*.xml')
 
         if len(self.files) == 0:
-            raise FileExistsError('No COCO formated .xml files found')
-
-
+            raise FileExistsError('No COCO formatted xml files found')
 
     def __len__(self):
-
+        """
+        :return:
+        """
         return len(self.files)
 
     def __getitem__(self, item):
+        """
+
+        :param item:
+        :return:
+        """
 
         image_data_path = os.path.splitext(self.files[item])[0] + '.tif'
         bbox_data_path = self.files[item]
-
         image = io.imread(image_data_path)
-
-        tree = ET.parse(bbox_data_path)
+        tree = xml.etree.ElementTree.parse(bbox_data_path)
         root = tree.getroot()
 
         bbox_loc = []
-        classlabels = []
+        class_labels = []
 
         for c in root.iter('object'):
             for cls in c.iter('name'):
 
-                classlabels.append(cls.text)
+                class_labels.append(cls.text)
 
             for a in c.iter('bndbox'):
                 x1 = int(a[0].text)
@@ -156,36 +147,25 @@ class section(Dataset):
                 y2 = int(a[3].text)
                 bbox_loc.append([x1, y1, x2, y2])
 
-        for i,s in enumerate(classlabels):
+        for i, s in enumerate(class_labels):
             if s == 'OHC1':
-                classlabels[i] = 1
+                class_labels[i] = 1
             elif s == 'OHC2':
-                classlabels[i] = 2
+                class_labels[i] = 2
             elif s == 'OHC3':
-                classlabels[i] = 3
+                class_labels[i] = 3
             elif s == 'IHC':
-                classlabels[i] = 4
+                class_labels[i] = 4
             else:
-                print(classlabels)
+                print(class_labels)
                 print(bbox_loc)
                 raise ValueError('Unidentified Label in XML file of ' + bbox_data_path)
 
         for it in self.image_transforms:
             image = it(image)
-
         for jt in self.joint_transforms:
             image, bbox_loc = jt(image, bbox_loc)
-
         for ot in self.out_transforms:
             image = ot(image)
 
-        return image, {'boxes': torch.tensor(bbox_loc), 'labels':torch.tensor(classlabels)}
-
-    @staticmethod
-    def image(path, transform):
-
-        image = io.imread(path)
-        for t in transform:
-            image = t(image)
-
-        return image
+        return image, {'boxes': torch.tensor(bbox_loc), 'labels': torch.tensor(class_labels)}
