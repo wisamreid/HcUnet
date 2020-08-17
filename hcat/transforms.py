@@ -525,12 +525,37 @@ class add_junk_image:
 
         self.index_remain = channel_index
         self.path = path
+
+        if self.path[-1] != '/':
+            self.path += '/'
+
         self.files = glob.glob(self.path+'*.tif')
-        self.junk_image_size=junk_image_size
+
+        if len(self.files) < 1:
+            raise FileNotFoundError(f'No valid *.tif files found at {path}')
+
+        self.junk_image_size = junk_image_size
         self.normalize = normalize
+
         if normalize:
             self.mean = normalize['mean']
             self.std = normalize['std']
+
+        self.images = []
+        for file in self.files:
+            im = io.imread(file)
+            im = to_float()(im)
+            if self.normalize:
+                for i in range(im.shape[-1]):
+                    im[:, :, i] -= self.mean[i]
+                    im[:, :, i] /= self.std[i]
+
+            # Check to see if the image has the right number of color channels
+            # If not, we drop one channel by the indexes defined by the user with self.index_remain
+            if not im.shape[-1] == len(self.index_remain):
+                im = im[:, :, self.index_remain]
+
+            self.images.append(im)
 
     def __call__(self, image, boxes):
         """
@@ -541,27 +566,25 @@ class add_junk_image:
         :param boxes:
         :return:
         """
-        i = np.random.randint(0,len(self.files))
-        junk_image = io.imread(self.files[i])
-        junk_image = to_float()(junk_image)
-
-        if not junk_image.shape[-1] == len(self.index_remain):
-            junk_image = junk_image[:, :, self.index_remain]
-
-        if self.normalize:
-            for i in range(junk_image.shape[-1]):
-                junk_image[:, :, i] -= self.mean[i]
-                junk_image[:, :, i] /= self.std[i]
+        file_index = np.random.randint(0, len(self.files))
+        junk_image = self.images[file_index]
 
         shape = junk_image.shape
-        x = np.random.randint(0, shape[0]-(self.junk_image_size[0]+1))
-        y = np.random.randint(0, shape[1]-(self.junk_image_size[1]+1))
+
+        try:
+            x = np.random.randint(0, shape[0]-(self.junk_image_size[0]+1))
+            y = np.random.randint(0, shape[1]-(self.junk_image_size[1]+1))
+        except ValueError:
+            raise ValueError(f'Junk image file {self.files[file_index]} has a shape ({shape}) smaller than max user defined shape')
+
         junk_image = junk_image[x:x+self.junk_image_size[0], y:y+self.junk_image_size[1], :]
 
         shape = image.shape
         x = np.random.randint(0, shape[0] - (self.junk_image_size[0] + 1))
         y = np.random.randint(0, shape[1] - (self.junk_image_size[1] + 1))
         image[x:x + self.junk_image_size[0], y:y + self.junk_image_size[1], :] = junk_image
+
+        # VECTORIZE FOR SPEED????
 
         for i, box in enumerate(boxes):
             box = np.array(box)

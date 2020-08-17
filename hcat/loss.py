@@ -13,7 +13,7 @@ def cross_entropy(pred: torch.Tensor, mask: torch.Tensor, pwl: torch.Tensor, met
                  to identical size of pred
     :param pwl:  torch.Tensor | weighting map pf shape [B, C, X+dx, Y+dy, Z+dz] that will be cropped to be identical in
                  size to pred and will be used to multiply the cross entropy loss at each pixel.
-    :param method: ['pixel', 'worst_z'] | method by which to weight loss
+    :param method: ['pixel', 'worst_z', 'random'] | method by which to weight loss
                         - pixel: weights each pixel size by values in pwl
                         - worst_z: adds additional exponentially decaying weight to z planes on with the largest weight
                                    to the worst performing z plane
@@ -26,7 +26,7 @@ def cross_entropy(pred: torch.Tensor, mask: torch.Tensor, pwl: torch.Tensor, met
     if method not in _methods:
         raise ValueError(f'Viable methods for cross entropy loss are {_methods}, not {method}.')
 
-    if method == 'pixel':
+    if method == 'random':
         if num_random_pixels is None:
             raise ValueError(f'the number of random pixels to draw is not defined. Please set num_random_pixels to a ' +
                              f'value larger than 1.')

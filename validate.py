@@ -9,6 +9,7 @@ import io
 import pickle
 import pymc3 as pm
 import pandas as pd
+import plotarchive as pa
 
 
 class RenameUnpickler(pickle.Unpickler):
@@ -100,7 +101,7 @@ for p in promoter_list:
                 dapi.append(cell.signal_stats['dapi']['mean'])
                 actin.append(cell.signal_stats['actin']['mean'])
 
-        gfp = np.array(gfp).flatten().__mul__(2**16).tolist()
+        gfp = np.log10(np.array(gfp).flatten().__mul__(2**16) + 1).tolist()
         myo = np.array(myo).flatten()
         dapi = np.array(dapi).flatten()
         actin = np.array(actin).flatten()
@@ -123,19 +124,33 @@ for p in promoter_list:
         idx[data['id'].values == k] = i
     print(idx, idx.shape)
 
+    # with pm.Model() as gfp_model:
+    #     # Hyperparams
+    #     alpha = pm.Bound(pm.Normal, lower=0)('alpha', mu=1000, sd=10000)
+    #     beta = pm.HalfCauchy('beta', beta=5000)
+    #
+    #     # Model
+    #     mu = pm.Normal('mu_animal', mu=alpha, sd=beta, shape=len(image_name))
+    #     sigma = pm.HalfCauchy('sigma', beta=100, shape=len(image_name))
+    #
+    #     obs = pm.Normal('obs', mu=mu[idx], sd=sigma[idx], observed=data['gfp'].values)
+
     with pm.Model() as gfp_model:
         # Hyperparams
-        alpha = pm.Bound(pm.Normal, lower=0)('alpha', mu=1000, sd=10000)
-        beta = pm.HalfCauchy('beta', beta=5000)
+        alpha = pm.Normal('alpha', mu=0, sd=2)
+        beta = pm.HalfCauchy('beta', beta=5)
 
         # Model
         mu = pm.Normal('mu_animal', mu=alpha, sd=beta, shape=len(image_name))
-        sigma = pm.HalfCauchy('sigma', beta=100, shape=len(image_name))
+        sigma = pm.HalfCauchy('sigma', beta=1, shape=len(image_name))
 
         obs = pm.Normal('obs', mu=mu[idx], sd=sigma[idx], observed=data['gfp'].values)
 
     with gfp_model:
-        trace = pm.sample(1000, progressbar=True, target_accept=.99)
+        trace = pm.sample(5000, progressbar=True, target_accept=.99)
+        print(pm.rhat(trace))
+        print(pm.summary(trace))
+        print(pm.bfmi(trace))
         pm.traceplot(trace)
         plt.tight_layout()
         plt.savefig(f'{p}_traceplot.png', dpi=300)
@@ -209,22 +224,27 @@ for p in promoter_list:
         # print('Done')
         # print('Done')
     #
-    plt.figure()
-    plt.boxplot(gfp_list)
-    ax = plt.gca()
-    plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
-    plt.ylabel('GFP cell average intensity')
-    plt.title('GFP (cell by cell)')
-    plt.show()
+    @pa.archive(filename='gfp_boxplots.pa')
+    def plot(x):
+        plt.figure()
+        plt.boxplot(x)
+        ax = plt.gca()
+        plt.xticks(np.arange(1, len(x)+1, 1), image_name, rotation=90)
+        plt.ylabel('GFP cell average intensity')
+        plt.title('GFP (cell by cell)')
+        plt.show()
+    plot(gfp_list)
 
-
-    plt.figure()
-    plt.boxplot(myo_list)
-    ax = plt.gca()
-    plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
-    plt.ylabel('myo7a cell average intensity')
-    plt.title('myo7a (cell by cell)')
-    plt.show()
+    @pa.archive(filename='myo_boxplots.pa')
+    def plot(x):
+        plt.figure()
+        plt.boxplot(x)
+        ax = plt.gca()
+        plt.xticks(np.arange(1, len(x)+1, 1), image_name, rotation=90)
+        plt.ylabel('GFP cell average intensity')
+        plt.title('GFP (cell by cell)')
+        plt.show()
+    plot(myo_list)
 
     plt.figure()
     plt.boxplot(dapi_list)

@@ -35,7 +35,7 @@ print('Initalizing Unet:  ',end='')
 unet = hcat.unet(image_dimensions=3,
                  in_channels=4,
                  out_channels=1,
-                 feature_sizes=[16,32,64,128],
+                 feature_sizes=[16, 32, 64, 128],
                  kernel={'conv1': (3, 3, 2), 'conv2': (3, 3, 1)},
                  upsample_kernel=(8, 8, 2),
                  max_pool_kernel=(2, 2, 1),
@@ -45,13 +45,13 @@ unet = hcat.unet(image_dimensions=3,
 
 # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
 unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun25_chris-MS-7C37_1.unet')
-test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
+test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 unet.to(device)
 unet.eval()
 print('Done')
 
 print('Initalizing FasterRCNN:  ', end='')
-faster_rcnn = hcat.rcnn(path='/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jul16_13:30.pth')
+faster_rcnn = hcat.rcnn(path='/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug15_13:28.pth')
 faster_rcnn.to(device)
 faster_rcnn.eval()
 print('Done')

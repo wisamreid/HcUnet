@@ -2,14 +2,14 @@ import skimage.io as io
 import os
 import ray
 import glob
-from hcat.train import utils
+from hcat.train import train_utils
 
 basedir = '/home/chris/Desktop/ColorImages/*.labels.tif'
 
 ray.init()
 
-mm = utils.makeMask(erosion=True)
-mpwl = utils.makePWL()
+mm = train_utils.makeMask(erosion=True)
+mpwl = train_utils.makePWL()
 
 images = glob.glob(basedir)
 print(images)
@@ -27,7 +27,7 @@ def make_mask(image_path):
     pwl = mpwl(basename+'.mask.tif')
     print(f'PWL MAX ray: {pwl.max()}')
     io.imsave(basename+'.pwl.tif', pwl)
-    image = utils.colormask_to_mask(image)
+    image = train_utils.colormask_to_mask(image)
     io.imsave(basename+'.mask.tif', image)
     print(basename, ' DONE')
     return image

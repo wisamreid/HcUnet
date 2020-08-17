@@ -13,7 +13,7 @@ def rcnn(path=None):
 
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                                  progress=True,
-                                                                 num_classes=5,
+                                                                 num_classes=3,
                                                                  pretrained_backbone=True,
                                                                  box_detections_per_img=500)
     if path is not None:

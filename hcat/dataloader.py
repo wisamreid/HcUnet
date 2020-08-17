@@ -92,7 +92,7 @@ class Section(Dataset):
     Dataloader for 2d faster rcnn
     """
 
-    def __init__(self, path, image_transforms, joint_transforms, out_transforms=None):
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=None, simple_class=False):
         """
 
         :param path:
@@ -101,6 +101,7 @@ class Section(Dataset):
         :param out_transforms:
         """
 
+
         if out_transforms is None:
             out_transforms = [t.to_tensor()]
 
@@ -108,10 +109,13 @@ class Section(Dataset):
         self.joint_transforms = joint_transforms
         self.out_transforms = out_transforms
 
+        # If true, reduces ever OHC1, OHC2, OHC3 to one class of just OHC's
+        self.simple_class = simple_class
+
         self.files = glob.glob(f'{path}{os.sep}*.xml')
 
         if len(self.files) == 0:
-            raise FileExistsError('No COCO formatted xml files found')
+            raise FileNotFoundError(f'No COCO formatted xml files found in {self.files}')
 
     def __len__(self):
         """
@@ -160,6 +164,14 @@ class Section(Dataset):
                 print(class_labels)
                 print(bbox_loc)
                 raise ValueError('Unidentified Label in XML file of ' + bbox_data_path)
+
+        class_labels = torch.tensor(class_labels)
+
+        # For testing - reduce row specific labels in cell specific (IHC or OHC)
+        if self.simple_class:
+            class_labels[class_labels == 2] = 1  # OHC2 -> OHC
+            class_labels[class_labels == 3] = 1  # OHC3 -> OHC
+            class_labels[class_labels == 4] = 2  # IHC
 
         for it in self.image_transforms:
             image = it(image)
