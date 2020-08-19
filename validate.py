@@ -264,5 +264,5 @@ for p in promoter_list:
 
 pm.densityplot(traces, data_labels = promoter_list)
 plt.title('Estimated mean cell intensity of each CMV')
-plt.xlabel('Mean pixel intensity (16bit)')
+plt.xlabel('Mean pixel intensity log10 (16bit)')
 plt.show()

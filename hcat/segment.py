@@ -10,7 +10,7 @@ import skimage.feature
 import cv2
 from hcat import utils
 from hcat.haircell import HairCell
-
+import matplotlib.pyplot as plt
 
 def predict_segmentation_mask(unet, image, device, use_probability_map = False):
     """
@@ -34,7 +34,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
     :return mask:
 
     """
-    PAD_SIZE = (128, 128, 4)
+    PAD_SIZE = (128, 128, 10)
     EVAL_IMAGE_SIZE = (300, 300, 15)
 
     mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.float)
@@ -101,6 +101,9 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
                                z[0]:z[0]+EVAL_IMAGE_SIZE[2]] = valid_out
                 except IndexError:
                     raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
+                except RuntimeError:
+                    raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} '
+                                       f'\npadded_image_slice.shape{padded_image_slice.shape} ')
 
                 iterations += 1
                 for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
@@ -188,6 +191,8 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
     :return: list of cell objects
     """
 
+    raise DeprecationWarning
+
     if len(predicted_cell_candidate_list['scores']) == 0:
         return None
 
@@ -220,8 +225,6 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
             dx[1] = image.shape[2] - x2
         if (y2 + dy[1]) > image.shape[3]:
             dy[1] = image.shape[3] - y2
-
-
 
         x1 = x1.clone()
         x2 = x2.clone()
@@ -278,8 +281,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
     PAD_SIZE = (25, 25, 0)
-    EVAL_IMAGE_SIZE = (200, 200, predicted_semantic_mask.shape[-1])
-    num_dialate = 2
+    EVAL_IMAGE_SIZE = (512, 512, predicted_semantic_mask.shape[-1])
 
     im_shape = predicted_semantic_mask.shape[2::]
     x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], predicted_semantic_mask.shape[2])
@@ -299,6 +301,12 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
     unique_cell_id = 1
     cells = []
+
+    a = predicted_cell_candidate_list['z_level'].numpy()
+    unique_z, counts = np.unique(a, return_counts=True)
+    i = np.argmax(counts)
+    best_z = unique_z[i]
+
     for i, (y1, x1, y2, x2) in enumerate(predicted_cell_candidate_list['boxes']):
 
         center = [int((x2-x1)/2), int((y2-y1)/2), int(predicted_cell_candidate_list['z_level'][i])]
@@ -313,6 +321,10 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
             y2 = torch.tensor(image.shape[3] - 1).float()
 
         if predicted_cell_candidate_list['scores'][i] < rejection_probability_threshold:
+            continue
+        elif predicted_cell_candidate_list['z_level'][i] < best_z-3: #SHIT CODE FIX YOU BOOB
+            continue
+        elif predicted_cell_candidate_list['z_level'][i] > best_z+3:
             continue
 
         dx = [-10, 10]
@@ -377,17 +389,34 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
             seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], :] = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
 
 
-            labels = skimage.segmentation.watershed(distance[0,0,:,:,:] * -1, seed_slice[0,0,:,:,:],
-                                                    mask=mask_slice_binary[0,0,:,:,:],
+            distance_expanded = np.zeros((distance.shape[2], distance.shape[3], distance.shape[4] * 2))
+            seed_slice_expanded = np.zeros((distance.shape[2], distance.shape[3], distance.shape[4] * 2))
+            mask_expanded = np.zeros((distance.shape[2], distance.shape[3], distance.shape[4] * 2))
+
+            for i in range(distance.shape[4]):
+                distance_expanded[:,:,(2*i)] = distance[0,0,:,:,i]
+                distance_expanded[:,:,(2*i + 1)] = distance[0,0,:,:,i]
+                seed_slice_expanded[:,:,(2*i)] = seed_slice[0,0,:,:,i]
+                mask_expanded[:,:,(2*i)] = mask_slice_binary[0,0,:,:,i]
+                mask_expanded[:,:,(2*i + 1)] = mask_slice_binary[0,0,:,:,i]
+
+            labels_expanded = skimage.segmentation.watershed(distance_expanded[:,:,:] * -1, seed_slice_expanded,
+                                                    mask=mask_expanded,
                                                     watershed_line=True, compactness=2)
 
-            # print(f' Watershed:{labels.max()}, SeedMax:{seed_slice.max()}, MaskSliceMax: {mask_slice.max()}, {seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :].max()}', end='\n')
+            labels = np.zeros(distance.shape)
+
+            for i in range(labels.shape[4]):
+                labels[0,0,:,:,i] = labels_expanded[:,:,2*i]
+
+            labels = labels[0,0,:,:,:]
+
             unique_mask[0, 0, x[0]:x[1], y[0]:y[1]:, :][labels>0] = labels[labels>0]
+
             # poop?
             iterations += 1
             for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
                 print('\b \b', end='')
-
 
     return unique_mask, seed
 

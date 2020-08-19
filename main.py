@@ -44,7 +44,7 @@ unet = hcat.unet(image_dimensions=3,
                  groups=2).to(device)
 
 # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
-unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun25_chris-MS-7C37_1.unet')
+unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug18_chris-MS-7C37_5.unet')
 test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
 unet.to(device)
 unet.eval()
@@ -105,7 +105,7 @@ for i, y in enumerate(y_ind):
         unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                     predicted_cell_candidate_list,
                                                                                     image_slice,
-                                                                                    rejection_probability_threshold=.5)
+                                                                                    rejection_probability_threshold=.2)
 
         print('Done')
 

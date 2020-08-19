@@ -5,7 +5,7 @@ import numpy as np
 import time
 
 
-def train(model, dataloader, optimizer, scheduler, num_epochs, lr, gamma, device, silent=False):
+def train(model, dataloader, optimizer, scheduler, num_epochs, lr, gamma, device, silent=False, scale=1):
 
     print(f'Started training at: {time.asctime(time.localtime())}')
     l = len(dataloader)
@@ -34,6 +34,8 @@ def train(model, dataloader, optimizer, scheduler, num_epochs, lr, gamma, device
 
             loss = None
             for i in outputs:
+                if i == 'loss_classifier':
+                    outputs[i] *= scale
                 if loss is None:
                     loss = outputs[i]
                 else:

@@ -14,7 +14,7 @@ model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                              num_classes=3,
                                                              pretrained_backbone=True,
                                                              box_detections_per_img=500)
-# model.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jul16_13:30.pth'))
+model.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug15_13:28.pth'))
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.train()
 model = model.to(device)
@@ -43,8 +43,10 @@ data = dataloader.Section(path='./Data/FasterRCNN_trainData/Top/',
                                             ]
                           )
 
+
+
 # Hyper Parameters
-num_epochs = 1500
+num_epochs = 200
 lr = 1e-5
 gamma = 0.998
 scale = 3
@@ -53,7 +55,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
 # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
 
-model, summed_losses = hcat.train.frcnn(model, data, optimizer, scheduler, num_epochs, lr, gamma, device)
+model, summed_losses = hcat.train.frcnn(model, data, optimizer, scheduler, num_epochs, lr, gamma, device, scale=40)
 torch.save(model.state_dict(), 'fasterrcnn_' + time.strftime('%b%d_%H:%M') + '.pth')
 print(f'Saved: {"fasterrcnn_" + time.strftime("%b%d_%H:%M") + ".pth"}')
 images, _ = data[19]
