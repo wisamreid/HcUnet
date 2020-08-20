@@ -95,7 +95,7 @@ for i, y in enumerate(y_ind):
         # We now want to predict the semantic segmentation mask for the chunk.
         print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x} , {y_ind[i-1]}:{y}]:', end=' ')
 
-        predicted_semantic_mask = hcat.predict_segmentation_mask(unet, image_slice, device, use_probability_map=False)
+        predicted_semantic_mask = hcat.predict_segmentation_mask(unet, image_slice, device, use_probability_map=True)
 
         print('Done')
 
@@ -105,7 +105,8 @@ for i, y in enumerate(y_ind):
         unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                     predicted_cell_candidate_list,
                                                                                     image_slice,
-                                                                                    rejection_probability_threshold=.2)
+                                                                                    rejection_probability_threshold=.2,
+                                                                                    mask_cell_prob_threshold=0.65)
 
         print('Done')
 

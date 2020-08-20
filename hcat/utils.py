@@ -72,11 +72,15 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
                      padded image
     :param eval_image_size: int corresponding to the shape of the image to be used for
                             the final mask
-    :param image_shape: Shape of image before padding is applied
-    :param padded_image_shape: Shape of image after padding is applied
+    :param image_shape: int Shape of image before padding is applied
+    :param padded_image_shape: int Shape of image after padding is applied
 
     :return: List of lists corresponding to the indexes
     """
+
+    # We want to account for when the eval image size is super big, just return index for the whole image.
+    if eval_image_size > image_shape:
+        return [[0, image_shape]]
 
     try:
         ind_list = torch.arange(0, image_shape, eval_image_size)

@@ -285,8 +285,10 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
     """
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
-    PAD_SIZE = (25, 25, 0)
-    EVAL_IMAGE_SIZE = (512, 512, predicted_semantic_mask.shape[-1])
+    # PAD_SIZE = (25, 25, 0)
+    PAD_SIZE = (0, 0, 0)
+    # EVAL_IMAGE_SIZE = (512, 512, predicted_semantic_mask.shape[-1])
+    EVAL_IMAGE_SIZE = (5120, 5120, predicted_semantic_mask.shape[-1])
 
     iterations = 0
     unique_cell_id = 1
@@ -375,7 +377,9 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
         image_slice = image[:, :, x1:x2, y1:y2, :]
         mask_slice = predicted_semantic_mask[:, :, x1:x2, y1:y2, :]
-        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), center[2]] = int(unique_cell_id)
+
+        # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
+        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z)] = int(unique_cell_id)
 
         # cells.append(HairCell(image_coords=(x1,y1,x2,y2), center=center, image=image_slice, mask=mask_slice, id= unique_cell_id))
 
