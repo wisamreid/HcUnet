@@ -12,7 +12,7 @@ from hcat import utils
 from hcat.haircell import HairCell
 import matplotlib.pyplot as plt
 
-def predict_segmentation_mask(unet, image, device, use_probability_map = False):
+def predict_segmentation_mask(unet, image, device, use_probability_map = False, mask_cell_prob_threshold=0.5):
     """
     Uses pretrained unet model to predict semantic segmentation of hair cells.
 
@@ -31,6 +31,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
     :param model: Trained Unet Model from unet.py
     :param image: torch.Tensor image with transforms pre applied!!! [1, 4, X, Y, Z]
     :param device: 'cuda' or 'cpu'
+    :param mask_cell_prob_threshold: float between 0 and 1 : min probability of cell used to generate the mask
     :return mask:
 
     """
@@ -88,7 +89,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map = False):
 
                 # Take pixels that are greater than 75% likely to be a cell.
                 if not use_probability_map:
-                    valid_out.gt_(.50)  # Greater Than
+                    valid_out.gt_(mask_cell_prob_threshold)  # Greater Than
                     valid_out = valid_out.type(torch.uint8)
                     if mask.dtype != torch.uint8:
                         mask = mask.type(torch.uint8)
@@ -255,7 +256,7 @@ def generate_unique_segmentation_mask(predicted_semantic_mask, predicted_cell_ca
     return cells
 
 
-def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, predicted_cell_candidate_list, image, rejection_probability_threshold=.95):
+def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, predicted_cell_candidate_list, image, rejection_probability_threshold=.95, mask_cell_prob_threshold=0.5):
     """
     S C R A T C H  P A D
 
@@ -272,10 +273,14 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
     Profit
 
 
+    Make it context aware, if passed a float for predicted_semantic_mask make it use the prob mask instead of the distance function
+
+
     :param mask:
     :param predicted_cell_candidate_list:
     :param image:
     :param rejection_probability_threshold:
+    :param use_probability_map: Bool, use calculated distance function with watershed
     :return:
     """
 
@@ -283,11 +288,14 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
     PAD_SIZE = (25, 25, 0)
     EVAL_IMAGE_SIZE = (512, 512, predicted_semantic_mask.shape[-1])
 
+    iterations = 0
+    unique_cell_id = 1
+    cells = []
+
     im_shape = predicted_semantic_mask.shape[2::]
     x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], predicted_semantic_mask.shape[2])
     y_ind = utils.calculate_indexes(PAD_SIZE[1], EVAL_IMAGE_SIZE[1], im_shape[1], predicted_semantic_mask.shape[3])
 
-    iterations = 0
     max_iter = (len(x_ind) * len(y_ind))-1
     unique_mask = np.zeros(predicted_semantic_mask.shape, dtype=np.int32)
     seed = np.zeros(unique_mask.shape, dtype=np.int)
@@ -299,8 +307,15 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
     if len(predicted_cell_candidate_list['scores']) == 0:
         return unique_mask, seed
 
-    unique_cell_id = 1
-    cells = []
+    if predicted_semantic_mask.dtype == np.float32:
+        USE_PROB_MAP = True
+    elif predicted_semantic_mask.dtype == np.uint8:
+        USE_PROB_MAP = False
+    else:
+        raise ValueError(f'Unknown predicted_semantic_mask dtype. {type(predicted_semantic_mask)}, '
+                         f'{predicted_semantic_mask.dtype} ')
+
+
 
     a = predicted_cell_candidate_list['z_level'].numpy()
     unique_z, counts = np.unique(a, return_counts=True)
@@ -366,9 +381,6 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
 
         unique_cell_id += 1
 
-    # print(unique_cell_id)
-    # print(seed.max())
-
     for i, x in enumerate(x_ind):
         for j, y in enumerate(y_ind):
             print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='')
@@ -376,18 +388,19 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask, 
             mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
             distance = np.zeros(mask_slice.shape)
 
-            mask_slice_binary = mask_slice > 0.35
-
-            for z in range(distance.shape[-1]):
-                distance[0,0,:,:,i] = cv2.distanceTransform(mask_slice_binary[0, 0, :, :, i].astype(np.uint8), cv2.DIST_L2, 5)
-
-            # for nul in range(num_dialate):
-            #     mask_slice_binary = skimage.morphology.binary_dilation(mask_slice_binary)
+            if USE_PROB_MAP:
+                mask_slice_binary = mask_slice > mask_cell_prob_threshold
+                for z in range(distance.shape[-1]):
+                    distance[0, 0, :, :, z] = mask_slice[0, 0, :, :, z]
+            else:
+                mask_slice_binary = np.copy(mask_slice)
+                for z in range(distance.shape[-1]):
+                    distance[0, 0, :, :, z] = cv2.distanceTransform(mask_slice[0, 0, :, :, z].astype(np.uint8),
+                                                                    cv2.DIST_L2, 5)
 
             seed_slice = np.zeros(mask_slice.shape).astype(np.int)
 
             seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], :] = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
-
 
             distance_expanded = np.zeros((distance.shape[2], distance.shape[3], distance.shape[4] * 2))
             seed_slice_expanded = np.zeros((distance.shape[2], distance.shape[3], distance.shape[4] * 2))
