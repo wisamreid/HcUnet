@@ -105,7 +105,7 @@ def analyze(path: str):
             unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                         predicted_cell_candidate_list,
                                                                                         image_slice,
-                                                                                        rejection_probability_threshold=.5)
+                                                                                        cell_prob_threshold=.5)
 
             print('Done')
 

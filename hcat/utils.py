@@ -1,18 +1,24 @@
 import torch
 import torchvision.ops
+
 import numpy as np
+
+import skimage
 import skimage.exposure
 import skimage.filters
 import skimage.morphology
 import skimage.feature
 import skimage.segmentation
-import skimage
+import skimage.transform
 import skimage.feature
+
 import scipy.ndimage
 import scipy.ndimage.morphology
 from scipy.interpolate import splprep, splev
+
 import pickle
 import glob
+
 import matplotlib.pyplot as plt
 
 
@@ -127,16 +133,21 @@ def get_cochlear_length(image, calibration, diagnostics=False):
 
     :return: Array
     """
-    # make a copy of the image
-    og_image = np.copy(image)
+    image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
 
+    for i in range(5):
+        image = skimage.morphology.binary_erosion(image)
+
+    plt.imshow(image)
+    plt.show()
     # first reshape to a logical image format and do a max project
-    image = image.transpose((1,2,3,0)).mean(axis=3)/2**16
+    if image.ndim > 2:
+        image = image.transpose((1,2,3,0)).mean(axis=3)/2**16
+        image = skimage.exposure.adjust_gamma(image[:,:,2], .2)
+        image = skimage.filters.gaussian(image, sigma=2) > .5
+        image = skimage.morphology.binary_erosion(image)
 
-    image = skimage.exposure.adjust_gamma(image[:,:,2], .2)
-    image = skimage.filters.gaussian(image, sigma=2) > .5
-    image = skimage.morphology.binary_erosion(image)
-    center_of_mass = scipy.ndimage.center_of_mass(image)
+    center_of_mass = np.array(scipy.ndimage.center_of_mass(image)) + 50
 
     # Turn the binary image into a list of points for each pixel that isnt black
     x, y = image.nonzero()
@@ -152,16 +163,20 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     theta = theta[ind]
     r = r[ind]
 
+
     # there will be a break somewhere because the cochlea isnt a full circle
     # Find the break and subtract 2pi to make the fun continuous
     loc = np.abs(theta[0:-2:1] - theta[1:-1:1])
     theta[loc.argmax()::] += -2*np.pi
-    ind = theta.argsort()
+    ind = theta.argsort()[1:-1:1]
     theta = theta[ind]
     r = r[ind]
 
+    plt.plot(theta,r)
+    plt.show()
+
     # run a spline in spherical space after sorting to get a best approximated fit
-    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=0.01, k=3)
+    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=0.004, k=3)
     u_new = np.arange(0,1,1e-4)
 
     # get new values of theta and r for the fitted line
@@ -182,12 +197,21 @@ def get_cochlear_length(image, calibration, diagnostics=False):
             equal_spaced_points.append(coord)
             base = coord
 
-    equal_spaced_points = np.array(equal_spaced_points)
+    equal_spaced_points = np.array(equal_spaced_points) * 10  # <-- Scale factor from above
+    equal_spaced_points = equal_spaced_points.T
+
+    curve = tck[1][0]
+    if curve[0] > curve[-1]:
+        apex = equal_spaced_points[:,-1]
+        percentage = np.linspace(1,0,len(equal_spaced_points[0,:]))
+    else:
+        apex = equal_spaced_points[:,0]
+        percentage = np.linspace(0,1,len(equal_spaced_points[0,:]))
 
     if not diagnostics:
-        return equal_spaced_points.T
+        return equal_spaced_points, percentage, apex
     else:
-        return equal_spaced_points.T, x_spline, y_spline, image, tck, u
+        return equal_spaced_points, x_spline, y_spline, image, tck, u
 
 
 def reconstruct_mask(path):

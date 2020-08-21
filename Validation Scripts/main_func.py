@@ -99,7 +99,7 @@ def analyze(path=path):
 
             print(f'\tAssigning cell labels for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:', end=' ')
             unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice,
-                                                                                           rejection_probability_threshold=.5)
+                                                                                           cell_prob_threshold=.5)
             print('Done')
 
             print(f'\tAssigning cell objects:', end=' ')

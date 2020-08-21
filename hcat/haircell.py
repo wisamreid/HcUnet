@@ -3,11 +3,12 @@ import numpy as np
 
 
 class HairCell:
-    def __init__(self, image_coords, center, image, mask, id):
+    def __init__(self, image_coords, center, image, mask, id, type=None):
         self.image_coords = image_coords # [x1, y1, z1, x2, y2, z2]
-        self.center = center# [x,y,z] with respect to the slice maybe?
+        self.center = center  # [x,y,z]
         # self.mask = mask # numpy array
         # self.frequency = []
+        self.type = type
         self.distance_from_apex = []
         self.unique_id = id
         self.is_bad = False
@@ -28,12 +29,7 @@ class HairCell:
             self.is_bad = True
             self.gfp_stats  = {'mean': np.NaN, 'std': np.NaN, 'median': np.NaN}
 
-    @property
-    def frequency(self):
-        raise NotImplementedError
-
-    @frequency.setter
-    def frequency(self, location, cochlea_curveature):
+    def set_frequency(self, cochlea_curve, percentage):
         """
         Somehow take location of cell, and the spline fit to estimate cochelar frequency.
 
@@ -41,8 +37,14 @@ class HairCell:
         :param cochlea_curveature:
         :return:
         """
+        x = cochlea_curve[1,:]
+        y = cochlea_curve[0,:]
 
-        raise NotImplementedError
+        i = np.argmin(np.abs(self.center[0] - x) + np.argmin(self.center[1] - y))
+
+        self._place_percentage = percentage[i]
+        self._closest_place = cochlea_curve[:, i]
+        self.frequency = [self._closest_place, self._place_percentage]
 
     @staticmethod
     def _calculate_gfp_statistics(image, mask, channel=1):
