@@ -1,6 +1,6 @@
 import os
 import glob
-from main_func import analyze
+from valscripts.main_func import analyze
 
 
 path = '/media/chris/Padlock_3/ToAnalyze/'
@@ -15,11 +15,11 @@ for image_loc in image_files:
     try:
         os.mkdir(foldername+'_cellBycell')
         os.chdir(foldername+'_cellBycell')
-        os.mkdir('../maskfiles')
-        analyze(image_loc)
-        os.chdir('../..')
+        os.mkdir('./maskfiles')
     except:
-        Warning(f'ERROR: {image_loc}, continuing...')
+        print(f'ERROR: {image_loc}, continuing...')
         continue
+    analyze(image_loc)
+    os.chdir('../..')
 
 

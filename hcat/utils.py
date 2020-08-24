@@ -277,15 +277,18 @@ def reconstruct_segmented(path):
             y_max = part.loc[1] + part.shape[3]
 
     mask = np.ones((1, 1, x_max, y_max, part.shape[-1]), dtype=part.dtype)
-
+    max_id = 0
     for f in files:
         part = pickle.load(open(f, 'rb'))
         x1 = part.loc[0]
         x2 = part.loc[0]+part.shape[2]
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
-        print(f'Index: [{x1}:{x2}, {y1}:{y2}]')
-        mask[:, :, x1:x2, y1:y2, :] = part.segmented_mask.astype(part.dtype)
+        unique = part.segmented_mask.astype(part.dtype)
+        unique[unique !=0] = (unique[unique != 0] + 0)
+        max_id = unique.max()
+        mask[:, :, x1:x2, y1:y2, :] = unique
+        del unique
 
     return mask
 

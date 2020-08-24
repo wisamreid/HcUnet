@@ -111,7 +111,8 @@ for i, y in enumerate(y_ind):
         print('Done')
 
         print(f'\tAssigning cell objects:', end=' ')
-        cell_list = hcat.generate_cell_objects(image_slice, unique_mask, x_ind_chunk=x_ind[j - 1], y_ind_chunk=y_ind[i - 1])
+        cell_list = hcat.generate_cell_objects(image_slice, unique_mask, cell_candidates=predicted_cell_candidate_list,
+                                               y_ind_chunk=x_ind[j - 1], x_ind_chunk=y_ind[i - 1])
         all_cells = all_cells + cell_list
         print('Done')
 
@@ -133,7 +134,7 @@ for i, y in enumerate(y_ind):
         io.imsave(f'predicted_prob_map_{i}_{j}.tif',
                   predicted_semantic_mask.numpy()[0, 0, :, :, :].transpose((2, 1, 0)))
 
-        a = mask.Part(predicted_semantic_mask.numpy(), torch.tensor([]), (x_ind[j - 1], y_ind[i - 1]))
+        a = mask.Part(predicted_semantic_mask.numpy(), unique_mask, (x_ind[j - 1], y_ind[i - 1]))
         pickle.dump(a, open(
             base + newfolder + '/' + time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
         a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
@@ -143,6 +144,11 @@ for i, y in enumerate(y_ind):
 print('Reconstructing Mask...', end='')
 mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
 print('Done!')
+
+print('Reconstructing Unique Mask...', end='')
+unique_mask=utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+print('Done!')
+
 print('Saving Image...', end='')
 io.imsave('test_mask.tif', mask[0, 0, :, :, :].transpose((2, 1, 0)))
 print('Done!')

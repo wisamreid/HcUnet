@@ -212,8 +212,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
 
     # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
-    PAD_SIZE = (1, 1, 0)
-    EVAL_IMAGE_SIZE = (1000, 1000, predicted_semantic_mask.shape[-1])
+    PAD_SIZE = (100, 100, 0)
+    EVAL_IMAGE_SIZE = (1024, 1024, predicted_semantic_mask.shape[-1])
 
     iterations = 0
     unique_cell_id = 1
@@ -367,6 +367,20 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Squeeze down to a 3d uint32 matrix
             labels = labels[0, 0, :, :, :]
 
+            # EXPERIMENTAL
+            # If we set any cell thats touching the edge to be zero, we can probabily merge better
+            left = labels[0,:,:]
+            right = labels[-1,:,:]
+            top = labels[:,0,:]
+            bottom = labels[:,-1,:]
+
+            edge_cells = []
+
+            for edge in [left,right,top,bottom]:
+                unqiue = np.unique(edge)
+                for id in unqiue:
+                    labels[labels == id] = 0
+
             # Combine mini chunk to larger chunk
             unique_mask[0, 0, x[0]:x[1], y[0]:y[1]:, :][labels > 0] = labels[labels > 0]
 
@@ -378,7 +392,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     return unique_mask, seed
 
 
-def generate_cell_objects(image: torch.Tensor,  unique_mask, x_ind_chunk, y_ind_chunk):
+def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_ind_chunk, y_ind_chunk):
     """
     Quick and dirty
 

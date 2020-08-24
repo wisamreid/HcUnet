@@ -11,7 +11,7 @@ class Part:
         self.loc = np.array(loc)  # This should be the top left corner ind
         self.mask = mask
         self.dtype = mask.dtype
-        # self.segmented_mask = segmented_mask
+        self.segmented_mask = segmented_mask
 
         # unique_segmentation_mask.astype(np.uint16)
     @property
@@ -19,11 +19,11 @@ class Part:
         if self.__mask is not None:
             return self.__mask
         else:
-            return np.zeros(self._shape)
+            return np.zeros(self._shape_mask)
 
     @mask.setter
     def mask(self, mask):
-        self._shape = mask.shape
+        self._shape_mask = mask.shape
         if np.sum(mask) == 0:
             self.__mask = None
         else:
@@ -34,12 +34,12 @@ class Part:
         if self.__segmented_mask is not None:
             return self.__segmented_mask
         else:
-            return np.zeros(self._shape)
+            return np.zeros(self._shape_segmented)
 
     @segmented_mask.setter
     def segmented_mask(self, mask):
-        self._shape = mask.shape
-        if np.sum(mask) == 0:
+        self._shape_segmented = mask.shape
+        if mask.sum() == 0:
             self.__segmented_mask = None
         else:
             self.__segmented_mask = mask

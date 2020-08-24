@@ -1,6 +1,7 @@
 from hcat.unet import Unet_Constructor as GUnet
-import transforms as t
+import hcat.transforms as t
 from hcat import mask as m, utils, segment
+import hcat
 import skimage.io as io
 import os
 import torch
@@ -35,33 +36,27 @@ def analyze(path=path):
     else:
         device = 'cpu'
 
-    print('Initalizing Unet:  ',end='')
-    unet= GUnet(image_dimensions=3,
-                in_channels=4,
-                out_channels=1,
-                feature_sizes=[16,32,64,128],
-                kernel={'conv1': (3, 3, 2), 'conv2': (3, 3, 1)},
-                upsample_kernel=(8, 8, 2),
-                max_pool_kernel=(2, 2, 1),
-                upsample_stride=(2, 2, 1),
-                dilation=1,
-                groups=2).to(device)
+    print('Initalizing Unet:  ', end='')
+    unet = hcat.unet(image_dimensions=3,
+                     in_channels=4,
+                     out_channels=1,
+                     feature_sizes=[16, 32, 64, 128],
+                     kernel={'conv1': (3, 3, 2), 'conv2': (3, 3, 1)},
+                     upsample_kernel=(8, 8, 2),
+                     max_pool_kernel=(2, 2, 1),
+                     upsample_stride=(2, 2, 1),
+                     dilation=1,
+                     groups=2).to(device)
 
-    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun7_chris-MS-7C37_1.unet')
-    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Jun25_chris-MS-7C37_1.unet')
-    test_image_path = 'Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged.tif'
+    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
+    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
     unet.eval()
     print('Done')
 
     print('Initalizing FasterRCNN:  ', end='')
-    faster_rcnn = models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
-                                                           progress=True,
-                                                           num_classes=5,
-                                                           pretrained_backbone=True,
-                                                           box_detections_per_img=500)
-
-    faster_rcnn.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Jul16_13:30.pth'))
+    faster_rcnn = hcat.rcnn(path='/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug20_13:49.pth')
     faster_rcnn.to(device)
     faster_rcnn.eval()
     print('Done')
@@ -89,21 +84,37 @@ def analyze(path=path):
 
             image_slice_frcnn = image_slice[:,[0,2,3],:,:,:]
 
-            print(f'\tGenerating list of cell candidates for chunk [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]: ', end='')
-            predicted_cell_candidate_list = segment.predict_cell_candidates(image_slice_frcnn.float().to(device), model=faster_rcnn, initial_coords=(x_ind[j - 1], y_ind[i - 1]))
+            print(f'\tGenerating list of cell candidates for chunk [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]: ', end='')
+
+            predicted_cell_candidate_list = hcat.predict_cell_candidates(image_slice_frcnn.float().to(device),
+                                                                         model=faster_rcnn,
+                                                                         initial_coords=(x_ind[j - 1], y_ind[i - 1]))
+
             print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]')
 
-            print(f'\tPredicting segmentation mask for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:',end=' ')
-            predicted_semantic_mask = segment.predict_segmentation_mask(unet, image_slice, device, use_probability_map=False)
-            print('Done')
+            # We now want to predict the semantic segmentation mask for the chunk.
+            print(f'\tPredicting segmentation mask for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ')
 
-            print(f'\tAssigning cell labels for [{x_ind[j-1]}:{x}, {y_ind[i-1]}:{y}]:', end=' ')
-            unique_mask, seed = segment.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(), predicted_cell_candidate_list, image_slice,
-                                                                                           cell_prob_threshold=.5)
+            predicted_semantic_mask = hcat.predict_segmentation_mask(unet, image_slice, device,
+                                                                     use_probability_map=True)
+
+            print(f'Done ')
+
+            # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
+            print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ')
+
+            unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
+                                                                                        predicted_cell_candidate_list,
+                                                                                        image_slice,
+                                                                                        cell_prob_threshold=0.4,
+                                                                                        mask_prob_threshold=0.4)
+
             print('Done')
 
             print(f'\tAssigning cell objects:', end=' ')
-            cell_list = segment.generate_cell_objects(image_slice, unique_mask)
+            cell_list = hcat.generate_cell_objects(image_slice, unique_mask,
+                                                   cell_candidates=predicted_cell_candidate_list,
+                                                   y_ind_chunk=x_ind[j - 1], x_ind_chunk=y_ind[i - 1])
             all_cells = all_cells + cell_list
             print('Done')
 

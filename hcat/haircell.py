@@ -37,8 +37,8 @@ class HairCell:
         :param cochlea_curveature:
         :return:
         """
-        x = cochlea_curve[1,:]
-        y = cochlea_curve[0,:]
+        x = cochlea_curve[0,:]
+        y = cochlea_curve[1,:]
 
         i = np.argmin(np.abs(self.center[0] - x) + np.argmin(self.center[1] - y))
 
