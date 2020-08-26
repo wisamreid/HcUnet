@@ -248,7 +248,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
 
     iterations = 0
-    unique_cell_id = 1
+    unique_cell_id = 2 # 1 is reserved for background
     cells = []
     expand_z = 4
 
@@ -387,15 +387,25 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
                     mask_expanded[:, :, (expand_z * i + j)] = mask_slice_binary[0, 0, :, :, i]
 
 
+            # # EXPERIMENTAL
+            # # maybe by adjusting the probability map to include steep cuttoffs in gradient, we can improve watershed
+            # distance_expanded[distance_expanded < .2] = 0
+
             # EXPERIMENTAL
-            # maybe by adjusting the probability map to include steep cuttoffs in gradient, we can improve watershed
-            distance_expanded[distance_expanded < .2] = 0
+            for i in range(5):
+                mask_expanded = skimage.morphology.binary_dilation(mask_expanded)
+            seed_slice_expanded[distance_expanded < 0.1] = 1
+
 
             # Run the watershed algorithm
             # Seems to help when you square the distance function... creates steeper gradients????
-            labels_expanded = skimage.segmentation.watershed((distance_expanded) * -2, seed_slice_expanded,
+            # compactness  > 0.8 is too much
+
+            labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
                                                     watershed_line=True, compactness=.03)
+
+            labels_expanded[labels_expanded == 1] = 0
 
             # Remove correction for nonisotropic voxels from the output
             for i in range(labels.shape[4]):
@@ -404,7 +414,6 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Squeeze down to a 3d uint32 matrix
             labels = labels[0, 0, :, :, :]
 
-            # EXPERIMENTAL
             # If we set any cell thats touching the edge to be zero, we can probabily merge better
             left = labels[0,:,:]
             right = labels[-1,:,:]
