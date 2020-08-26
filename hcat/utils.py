@@ -134,12 +134,13 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     :return: Array
     """
     image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
+    image = skimage.morphology.binary_closing(image)
 
-    for i in range(5):
+    for i in range(10):
         image = skimage.morphology.binary_erosion(image)
 
-    plt.imshow(image)
-    plt.show()
+    image = skimage.morphology.skeletonize(image)
+
     # first reshape to a logical image format and do a max project
     if image.ndim > 2:
         image = image.transpose((1,2,3,0)).mean(axis=3)/2**16
@@ -171,9 +172,6 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     ind = theta.argsort()[1:-1:1]
     theta = theta[ind]
     r = r[ind]
-
-    plt.plot(theta,r)
-    plt.show()
 
     # run a spline in spherical space after sorting to get a best approximated fit
     tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=0.004, k=3)
@@ -285,7 +283,7 @@ def reconstruct_segmented(path):
         y1 = part.loc[1]
         y2 = part.loc[1]+part.shape[3]
         unique = part.segmented_mask.astype(part.dtype)
-        unique[unique !=0] = (unique[unique != 0] + 0)
+        unique[unique !=0] = (unique[unique != 0] + max_id)
         max_id = unique.max()
         mask[:, :, x1:x2, y1:y2, :] = unique
         del unique

@@ -1,6 +1,6 @@
 import os
 import glob
-from valscripts.main_func import analyze
+from main import analyze
 
 
 path = '/media/chris/Padlock_3/ToAnalyze/'

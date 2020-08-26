@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 import skimage.exposure
 import skimage.filters
 import skimage.morphology
@@ -8,9 +9,11 @@ import skimage.segmentation
 import skimage
 import skimage.feature
 import cv2
+
+import hcat
 from hcat import utils
 from hcat.haircell import HairCell
-import matplotlib.pyplot as plt
+
 
 
 def predict_segmentation_mask(unet, image, device, use_probability_map=False, mask_cell_prob_threshold=0.5):
@@ -37,9 +40,19 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
     :return mask:
 
     """
+    # Check for total cuda memory to avoid overflow later
     # Define useful variables
-    PAD_SIZE = (128, 128, 10)
-    EVAL_IMAGE_SIZE = (300, 300, 15)
+    # Common GPU Memory Sizes (4, 6, 8, 11)
+    _eval_im_size = {'4': (128, 128, 6),  # In GB
+                     '6': (300, 300, 6),
+                     '8': (300, 300, 10),
+                     '11': (300, 300, 15)}
+    if hcat.__CUDA_MEM__:
+        PAD_SIZE = (128, 128, 10)
+        EVAL_IMAGE_SIZE = _eval_im_size[str(int(np.floor(hcat.__CUDA_MEM__/1e9)))]
+    else:
+        PAD_SIZE = (128, 128, 10)
+        EVAL_IMAGE_SIZE = (300, 300, 15)
 
     mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.float)
     im_shape = image.shape
@@ -141,8 +154,16 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
     :return:
     """
     # Define some useful stuff
-    PAD_SIZE = (24, 24, 0)
-    EVAL_IMAGE_SIZE = (500, 500, image.shape[-1])
+    _eval_im_size = {'4': (128, 128),  # In GB
+                     '6': (300, 300),
+                     '8': (500, 500),
+                     '11': (600, 600)}
+    if hcat.__CUDA_MEM__:
+        PAD_SIZE = (24, 24)
+        EVAL_IMAGE_SIZE = _eval_im_size[str(int(np.floor(hcat.__CUDA_MEM__/1e9)))]
+    else:
+        PAD_SIZE = (24, 24)
+        EVAL_IMAGE_SIZE = (500, 500)
 
     im_shape = image.shape[2::]
 
@@ -209,11 +230,22 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     :param mask_prob_threshold:
     :return:
     """
+    # Define some useful stuff
+    # Get memory usage - May need to fine tune later
+    if np.round(hcat.__CPU_MEM__/1e9) >= 16:
+        PAD_SIZE = [100, 100]
+        EVAL_IMAGE_SIZE = [1024, 1024]
+    else:
+        PAD_SIZE = [100, 100]
+        EVAL_IMAGE_SIZE = [512, 512]
 
+    for dim, ps in enumerate(EVAL_IMAGE_SIZE):
+        dim += 2
+        shape = image.shape
+        if shape[dim] < ps + 2*PAD_SIZE[dim-2]:
+            EVAL_IMAGE_SIZE[dim-2] = shape[dim]
+            PAD_SIZE[dim-2] = 1
 
-    # THESE DONT NECESSARILY HAVE TO BE THE SAME AS ABOVE.
-    PAD_SIZE = (100, 100, 0)
-    EVAL_IMAGE_SIZE = (1024, 1024, predicted_semantic_mask.shape[-1])
 
     iterations = 0
     unique_cell_id = 1
@@ -339,13 +371,18 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # We want to run watershed with some padding
             # This will help us merge segmentations together later
-            seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], :] = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
+            seed_slice[:, :, PAD_SIZE[0]:PAD_SIZE[0]+EVAL_IMAGE_SIZE[0], PAD_SIZE[1]:PAD_SIZE[1]+EVAL_IMAGE_SIZE[1], :] \
+                = seed[:, :, x[0]+PAD_SIZE[0]:x[1]-PAD_SIZE[0]+1, y[0]+PAD_SIZE[1]:y[1]-PAD_SIZE[1]+1, :]
 
             # Confocal voxels are nonisotropic and the watershed algorithm cannot correct for this
             # We manually correct for this by copying z slices and expanding the z dim
             for i in range(distance.shape[4]):
                 for j in range(expand_z):
-                    distance_expanded[:, :, (expand_z * i + j)] = distance[0, 0, :, :, i]
+                    if j != 0:
+                        val=2
+                    else:
+                        val=1
+                    distance_expanded[:, :, (expand_z * i + j)] = distance[0, 0, :, :, i] ** val
                     seed_slice_expanded[:, :, (expand_z * i + j)] = seed_slice[0, 0, :, :, i]
                     mask_expanded[:, :, (expand_z * i + j)] = mask_slice_binary[0, 0, :, :, i]
 
@@ -356,9 +393,9 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # Run the watershed algorithm
             # Seems to help when you square the distance function... creates steeper gradients????
-            labels_expanded = skimage.segmentation.watershed((distance_expanded ** 5) * -1, seed_slice_expanded,
+            labels_expanded = skimage.segmentation.watershed((distance_expanded) * -2, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=.01)
+                                                    watershed_line=True, compactness=.03)
 
             # Remove correction for nonisotropic voxels from the output
             for i in range(labels.shape[4]):
@@ -411,16 +448,22 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
     :param unique_mask: [X,Y,Z] numpy array
     :return:
     """
+    if unique_mask.ndim != 3:
+        unique_mask = unique_mask[0,0,:,:,:]
 
     cell_ids = np.unique(unique_mask)
-    indicies = np.indices(unique_mask[0,0,:,:,:].shape) # Should be 3xMxN
+    indicies = np.indices(unique_mask.shape) # Should be 3xMxN
     cell_list = []
+    num_cells = len(cell_ids)
+    print(' ',end='')
 
-    for id in cell_ids:
+    for i, id in enumerate(cell_ids):
         if id == 0:
             continue
+        s = f'{i}/{num_cells}'
+        print(s, end='')
 
-        mask = (unique_mask == id)[0,0,:,:,:]
+        mask = (unique_mask == id)
         x_ind = indicies[0, :, :, :][mask]
         y_ind = indicies[1, :, :, :][mask]
         z_ind = indicies[2, :, :, :][mask]
@@ -429,11 +472,15 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
         z = (z_ind.min(), z_ind.max())
 
         image_coords = [x[0], y[0], z[0], x[1], y[1], z[1]]
-        center = [(x[0] + (x[1]-x[0])/2) + x_ind_chunk, y[0] + (y[1]-y[0]/2) + y_ind_chunk, (z[1]-z[0])/2]
+
+        center = [(x[0] + (x[1]-x[0])/2) + x_ind_chunk, y[0] + ((y[1]-y[0])/2) + y_ind_chunk, (z[1]-z[0])/2]
+        # center = [x[0], y[0], z[0]]
         image_slice = image[:, :, x[0]:x[1], y[0]:y[1], z[0]:z[1]]
         mask = mask[x[0]:x[1], y[0]:y[1], z[0]:z[1]]
 
         cell = HairCell(image_coords=image_coords, center=center, image=image_slice, mask=mask, id=id)
         cell_list.append(cell)
+        print('\b \b'*(len(s)-1)  , end='')
+        print('\b',end='')
 
     return cell_list

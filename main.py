@@ -120,7 +120,8 @@ def analyze(path=None):
 
             print(f'\tAssigning cell objects:', end=' ')
             cell_list = hcat.generate_cell_objects(image_slice, unique_mask, cell_candidates=predicted_cell_candidate_list,
-                                                   y_ind_chunk=x_ind[j - 1], x_ind_chunk=y_ind[i - 1])
+                                                   y_ind_chunk=y_ind[i - 1],
+                                                   x_ind_chunk=x_ind[j - 1])
             all_cells = all_cells + cell_list
             print('Done')
 
@@ -144,27 +145,39 @@ def analyze(path=None):
 
             a = hcat.mask.Part(predicted_semantic_mask.numpy(), unique_mask, (x_ind[j - 1], y_ind[i - 1]))
             pickle.dump(a, open(
-                base + newfolder + '/' + time.strftime("%y:%m:%d_%H:%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
+                base + newfolder + '/' + time.strftime("%y-%m-%d_%H-%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
             a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
 
             del unique_mask, seed, predicted_cell_candidate_list, image_slice_frcnn, image_slice
 
     print('Reconstructing Mask...', end='')
-    mask = utils.reconstruct_mask('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+    mask = utils.reconstruct_mask('maskfiles/' + newfolder)
     print('Done!')
 
     print('Reconstructing Unique Mask...', end='')
-    unique_mask=utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
+    unique_mask=utils.reconstruct_segmented('maskfiles/' + newfolder)
     print('Done!')
 
-    print('Saving Image...', end='')
+    print('Saving Instance Mask...', end='')
     io.imsave('test_mask.tif', mask[0, 0, :, :, :].transpose((2, 1, 0)))
     print('Done!')
 
-    mask = mask[0,0,:,:,:].sum(-1)
+    print('Saving Unique Mask...', end='')
+    io.imsave('test_unqiue_mask.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
+    print('Done!')
+
+    print('Saving Cells...',end='')
+    pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
+    print('Done!')
+
 
     print(f'Caluclating spline fit of cochlea...',end=' ')
-    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask > .5, calibration=5)
+    if mask.dtype == np.float:
+        mask = torch.from_numpy(mask)
+        mask.gt_(.5)
+        mask = mask.numpy()
+
+    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask[0,0,:,:,:].sum(-1) > 5, calibration=2)
     print('Done')
 
     print(f'Assigning freq to cell...', end=' ')
@@ -173,14 +186,23 @@ def analyze(path=None):
     print('Done')
 
     plt.figure(figsize=(30,30))
-    plt.imshow(mask/mask.max())
+    plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
     plt.plot(cochlear_length[0,:], cochlear_length[1,:])
     for cell in all_cells:
-        x = [cell.center[0], cell.frequency[0][0]]
-        y = [cell.center[1], cell.frequency[0][1]]
-        plt.plot(x,y,'r-')
+        plt.plot(cell.center[1], cell.center[0], 'b.')
+        x = [cell.center[1], cell.frequency[0][0]]
+        y = [cell.center[0], cell.frequency[0][1]]
+        plt.plot(x, y, 'r-')
     plt.savefig('allcellsonmask.tif',dpi=400)
     plt.show()
+
+    plt.figure()
+    for cell in all_cells:
+        plt.plot(cell.frequency[1], cell.gfp_stats['mean'], 'k.')
+    plt.xlabel('Percentage Base to Apex')
+    plt.ylabel('GFP Cell Mean')
+    plt.show()
+
 
     gfp = []
     myo = []
@@ -226,27 +248,27 @@ def analyze(path=None):
 
 
 
-    mask = mask[0, 0, :, :, :].transpose((2, 1, 0))
-    gfp = image[mask > 0]
-    gfp = np.array(gfp[:, 1]) / 2 ** 16
-
+    # mask = mask[0, 0, :, :, :].transpose((2, 1, 0))
+    # gfp = image[mask > 0]
+    # gfp = np.array(gfp[:, 1]) / 2 ** 16
+    #
+    # # plt.figure()
+    # # plt.hist(gfp, bins=100, range=[0.00000001, 1])
+    # # plt.axvline(gfp.mean(),c='r', linestyle='-')
+    # # plt.xlabel('GFP Intensity (excludes 0)')
+    # # plt.ylabel('Occurrence (px)')
+    # # plt.title(path, fontdict={'fontsize': 8})
+    # # plt.savefig('hist1.png')
+    # # plt.show()
+    #
     # plt.figure()
-    # plt.hist(gfp, bins=100, range=[0.00000001, 1])
-    # plt.axvline(gfp.mean(),c='r', linestyle='-')
-    # plt.xlabel('GFP Intensity (excludes 0)')
+    # plt.hist(gfp, bins=100, range=[0, 1])
+    # plt.axvline(gfp.mean(), c='r', linestyle='-')
+    # plt.xlabel('GFP Intensity')
     # plt.ylabel('Occurrence (px)')
     # plt.title(path, fontdict={'fontsize': 8})
-    # plt.savefig('hist1.png')
+    # plt.savefig('hist2.png')
     # plt.show()
-
-    plt.figure()
-    plt.hist(gfp, bins=100, range=[0, 1])
-    plt.axvline(gfp.mean(), c='r', linestyle='-')
-    plt.xlabel('GFP Intensity')
-    plt.ylabel('Occurrence (px)')
-    plt.title(path, fontdict={'fontsize': 8})
-    plt.savefig('hist2.png')
-    plt.show()
 
     # mask = utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
     #

@@ -14,16 +14,19 @@ class HairCell:
         self.is_bad = False
         self.signal_stats = {}
 
+        if isinstance(image, torch.Tensor):
+            image = image.numpy()
+
         for i, channel in enumerate(['dapi', 'gfp', 'myo7a', 'actin']):
             if mask.sum() > 1:
-                self.signal_stats[channel] = self._calculate_gfp_statistics(image.float().numpy(), mask, i)  # green channel flattened array
+                self.signal_stats[channel] = self._calculate_gfp_statistics(image, mask, i)  # green channel flattened array
             else:
                 self.unique_mask = torch.zeros(10)
                 self.is_bad = True
                 self.signal_stats[channel] = {'mean': np.NaN, 'std': np.NaN, 'median': np.NaN}
 
         if mask.sum() > 1:
-            self.gfp_stats = self._calculate_gfp_statistics(image.float().numpy(), mask) # green channel flattened array
+            self.gfp_stats = self._calculate_gfp_statistics(image, mask) # green channel flattened array
         else:
             self.unique_mask = torch.zeros(10)
             self.is_bad = True
@@ -40,7 +43,8 @@ class HairCell:
         x = cochlea_curve[0,:]
         y = cochlea_curve[1,:]
 
-        i = np.argmin(np.abs(self.center[0] - x) + np.argmin(self.center[1] - y))
+        dist = np.sqrt((self.center[1] - x) ** 2 + (self.center[0] - y) ** 2)
+        i = np.argmin(dist)
 
         self._place_percentage = percentage[i]
         self._closest_place = cochlea_curve[:, i]
@@ -67,7 +71,7 @@ class HairCell:
         if image.min() < 0:
             gfp = (image[0, channel, :, :, :][mask] * 0.5) + 0.5
         else:
-            gfp = image[0, channel, :, :, :][mask].float()
+            gfp = image[0, channel, :, :, :][mask]
 
         return {'mean': gfp.mean(), 'std': gfp.std(), 'median': np.median(gfp), 'num_samples': gfp.shape}
 

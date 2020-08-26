@@ -10,6 +10,7 @@ mem = psutil.virtual_memory()
 __CPU_MEM__ = mem.total
 
 if torch.cuda.is_available():
-    __CUDA_MEM__ = torch.cuda.memory_allocated()
+    torch.cuda.init()
+    __CUDA_MEM__ = torch.cuda.get_device_properties(0).total_memory
 else:
     __CUDA_MEM__ = False
