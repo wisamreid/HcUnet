@@ -6,23 +6,20 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import ray
 import pickle
 import time
-import logging
 import glob
-from torchvision import models
+import skimage.filters
 
 
+def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chunk_storage=None):
 
-
-def analyze(path=None, numchunks=3):
+    if path_chunk_storage is None:
+        raise NotADirectoryError(f'Specify a path to chunk storage.')
 
     if path is None:
-        path = '/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
+        path = '../Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
         # path = '/media/chris/Padlock_3/ToAnalyze/Jul 18 Control m1.lif - TileScan 1 Merged.tif'
-
-    ray.init(logging_level=logging.CRITICAL)
 
     transforms = [
         t.to_float(),
@@ -71,9 +68,10 @@ def analyze(path=None, numchunks=3):
     y_ind = np.linspace(0, image.shape[1], num_chunks).astype(np.int16)
     x_ind = np.linspace(0, image.shape[2], num_chunks).astype(np.int16)
 
-    base = './maskfiles/'
-    newfolder = time.strftime('%y%m%d%H%M')
-    os.mkdir(base + newfolder)
+    # base = './maskfiles/'
+    # newfolder = time.strftime('%y%m%d%H%M')
+    # os.mkdir(base + newfolder)
+
     all_cells = []
 
     for i, y in enumerate(y_ind):
@@ -108,6 +106,11 @@ def analyze(path=None, numchunks=3):
 
             print(f'Done ', flush=True)
 
+            # Experimental
+            predicted_semantic_mask = torch.tensor(skimage.filters.gaussian(predicted_semantic_mask.numpy()))
+            predicted_semantic_mask[predicted_semantic_mask < 0.15] = 0
+            predicted_semantic_mask = predicted_semantic_mask * 10
+
             # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
             print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
 
@@ -126,54 +129,62 @@ def analyze(path=None, numchunks=3):
             all_cells = all_cells + cell_list
             print('Done', flush=True)
 
-            if len(predicted_cell_candidate_list['scores']) > 0:
+            if show_plots or save_plots:
+                if len(predicted_cell_candidate_list['scores']) > 0:
+                    plt.figure(figsize=(20, 20))
+                    utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 7], [predicted_cell_candidate_list], .5)
+                    if save_plots:
+                        plt.savefig(f'chunk{i}_{j}.tif')
+                    if show_plots:
+                        plt.show()
+                    plt.close()
+
                 plt.figure(figsize=(20, 20))
-                utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 7], [predicted_cell_candidate_list], .5)
-                plt.savefig(f'chunk{i}_{j}.tif')
-                # plt.show()
+                plt.imshow(unique_mask[0, 0, :, :, 8])
+                if show_plots:
+                    plt.show()
                 plt.close()
 
-            plt.figure(figsize=(20, 20))
-            plt.imshow(unique_mask[0, 0, :, :, 8])
-            # plt.show()
-            plt.close()
+                plt.figure(figsize=(20, 20))
+                plt.imshow(predicted_semantic_mask.numpy()[0, 0, :, :, 8]**2 )
+                if show_plots:
+                    plt.show()
+                plt.close()
 
-            plt.figure(figsize=(20, 20))
-            plt.imshow(predicted_semantic_mask.numpy()[0, 0, :, :, 8], )
-            # plt.show()
-            plt.close()
-
-            io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
-            io.imsave(f'predicted_prob_map_{i}_{j}.tif',
-                      predicted_semantic_mask.numpy()[0, 0, :, :, :].transpose((2, 1, 0)))
+            if save_plots:
+                io.imsave(f'unique_mask_{i}_{j}.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
+                io.imsave(f'predicted_prob_map_{i}_{j}.tif',
+                          predicted_semantic_mask.numpy()[0, 0, :, :, :].transpose((2, 1, 0)))
 
             a = hcat.mask.Part(predicted_semantic_mask.numpy(), unique_mask, (x_ind[j - 1], y_ind[i - 1]))
             pickle.dump(a, open(
-                base + newfolder + '/' + time.strftime("%y-%m-%d_%H-%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
+                path_chunk_storage + '/' + time.strftime("%y-%m-%d_%H-%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
             a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
 
             del unique_mask, seed, predicted_cell_candidate_list, image_slice_frcnn, image_slice
 
     print('Reconstructing Mask...', end='', flush=True)
-    mask = utils.reconstruct_mask('maskfiles/' + newfolder)
+    mask = utils.reconstruct_mask(path_chunk_storage)
     print('Done!', flush=True)
 
     print('Reconstructing Unique Mask...', end='', flush=True)
-    unique_mask=utils.reconstruct_segmented('maskfiles/' + newfolder)
+    unique_mask=utils.reconstruct_segmented(path_chunk_storage)
     print('Done!', flush=True)
 
-    print('Saving Instance Mask...', end='', flush=True)
-    io.imsave('test_mask.tif', mask[0, 0, :, :, :].transpose((2, 1, 0)))
-    print('Done!', flush=True)
+    if save_plots:
+        print('Saving Instance Mask...', end='', flush=True)
+        io.imsave('test_mask.tif', mask[0, 0, :, :, :].transpose((2, 1, 0)))
+        print('Done!', flush=True)
 
-    print('Saving Unique Mask...', end='', flush=True)
-    io.imsave('test_unqiue_mask.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
-    print('Done!', flush=True)
+    if save_plots:
+        print('Saving Unique Mask...', end='', flush=True)
+        io.imsave('test_unqiue_mask.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
+        print('Done!', flush=True)
 
-    print('Saving Cells...',end='', flush=True)
-    pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
-    print('Done!', flush=True)
-
+    if save_plots:
+        print('Saving Cells...',end='', flush=True)
+        pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
+        print('Done!', flush=True)
 
     print(f'Caluclating spline fit of cochlea...',end=' ', flush=True)
     if mask.dtype == np.float:
@@ -189,117 +200,101 @@ def analyze(path=None, numchunks=3):
         cell.set_frequency(cochlear_length, percent_base_to_apex)
     print('Done', flush=True)
 
-    plt.figure(figsize=(30,30))
-    plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
-    plt.plot(cochlear_length[0,:], cochlear_length[1,:])
-    for cell in all_cells:
-        plt.plot(cell.center[1], cell.center[0], 'b.')
-        x = [cell.center[1], cell.frequency[0][0]]
-        y = [cell.center[0], cell.frequency[0][1]]
-        plt.plot(x, y, 'r-')
-    plt.savefig('allcellsonmask.tif',dpi=400)
-    # plt.show()
-    plt.close()
+    if show_plots or save_plots:
+        plt.figure(figsize=(30,30))
+        plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
+        plt.plot(cochlear_length[0,:], cochlear_length[1,:])
+        for cell in all_cells:
+            plt.plot(cell.center[1], cell.center[0], 'b.')
+            x = [cell.center[1], cell.frequency[0][0]]
+            y = [cell.center[0], cell.frequency[0][1]]
+            plt.plot(x, y, 'r-')
+        if save_plots:
+            plt.savefig('allcellsonmask.tif',dpi=400)
+        if show_plots:
+            plt.show()
+        plt.close()
 
-    plt.figure()
-    for cell in all_cells:
-        plt.plot(cell.frequency[1], cell.gfp_stats['mean'], 'k.')
-    plt.xlabel('Percentage Base to Apex')
-    plt.ylabel('GFP Cell Mean')
-    plt.savefig('gfp_mean_vs_loc.tif',dpi=400)
-    # plt.show()
-    plt.close()
+        plt.figure()
+        for cell in all_cells:
+            plt.plot(cell.frequency[1], cell.gfp_stats['mean'], 'k.')
+        plt.xlabel('Percentage Base to Apex')
+        plt.ylabel('GFP Cell Mean')
+        if save_plots:
+            plt.savefig('gfp_mean_vs_loc.tif',dpi=400)
+        if show_plots:
+            plt.show()
+        plt.close()
 
+        gfp = []
+        myo = []
+        dapi = []
+        actin = []
+        for cell in all_cells:
+            if not np.isnan(cell.gfp_stats['mean']):
+                gfp.append(cell.gfp_stats['mean'])
+                myo.append(cell.signal_stats['myo7a']['mean'])
+                dapi.append(cell.signal_stats['dapi']['mean'])
+                actin.append(cell.signal_stats['actin']['mean'])
 
-    gfp = []
-    myo = []
-    dapi = []
-    actin = []
-    for cell in all_cells:
-        if not np.isnan(cell.gfp_stats['mean']):
-            gfp.append(cell.gfp_stats['mean'])
-            myo.append(cell.signal_stats['myo7a']['mean'])
-            dapi.append(cell.signal_stats['dapi']['mean'])
-            actin.append(cell.signal_stats['actin']['mean'])
+        print('Yeeting', flush=True)
+        gfp = np.array(gfp).flatten()
+        myo = np.array(myo).flatten()
+        dapi = np.array(dapi).flatten()
+        actin = np.array(actin).flatten()
 
-    print('Yeeting', flush=True)
-    gfp = np.array(gfp).flatten()
-    myo = np.array(myo).flatten()
-    dapi = np.array(dapi).flatten()
-    actin = np.array(actin).flatten()
+        plt.figure()
+        plt.hist(gfp, bins=50)
+        plt.axvline(gfp.mean(), c='red', linestyle='-')
+        plt.xlabel('GFP Intensity')
+        plt.ylabel('Occurrence (cells)')
+        plt.title(path, fontdict={'fontsize': 8})
+        if save_plots:
+            plt.savefig('hist0_gfp.png')
+        if show_plots:
+            plt.show()
+        plt.close()
 
-    plt.figure()
-    plt.hist(gfp, bins=50)
-    plt.axvline(gfp.mean(), c='red', linestyle='-')
-    plt.xlabel('GFP Intensity')
-    plt.ylabel('Occurrence (cells)')
-    plt.title(path, fontdict={'fontsize': 8})
-    plt.savefig('hist0_gfp.png')
-    # plt.show()
-    plt.close()
+        plt.figure()
+        plt.hist(gfp, color='green', bins=50, alpha=0.6)
+        plt.hist(myo, color='yellow', bins=50, alpha=0.6)
+        plt.hist(dapi, color='blue', bins=50, alpha=0.6)
+        plt.hist(actin, color='red', bins=50, alpha=0.6)
+        plt.axvline(gfp.mean(), c='green', linestyle='-')
+        plt.axvline(myo.mean(), c='yellow', linestyle='-')
+        plt.axvline(dapi.mean(), c='blue', linestyle='-')
+        plt.axvline(actin.mean(), c='red', linestyle='-')
+        plt.xlabel('Signal Intensity')
+        plt.ylabel('Occurrence (cells)')
+        plt.title(path, fontdict={'fontsize': 8})
+        if save_plots:
+            plt.savefig('~/Documents/HcUnetIm/hist0_all_colors.png')
+        if show_plots:
+            plt.show()
+        plt.close()
+        print('Done', flush=True)
 
-    plt.figure()
-    plt.hist(gfp, color='green', bins=50, alpha=0.6)
-    plt.hist(myo, color='yellow', bins=50, alpha=0.6)
-    plt.hist(dapi, color='blue', bins=50, alpha=0.6)
-    plt.hist(actin, color='red', bins=50, alpha=0.6)
-    plt.axvline(gfp.mean(), c='green', linestyle='-')
-    plt.axvline(myo.mean(), c='yellow', linestyle='-')
-    plt.axvline(dapi.mean(), c='blue', linestyle='-')
-    plt.axvline(actin.mean(), c='red', linestyle='-')
-    plt.xlabel('Signal Intensity')
-    plt.ylabel('Occurrence (cells)')
-    plt.title(path, fontdict={'fontsize': 8})
-    plt.savefig('hist0_all_colors.png')
-    # plt.show()
-    plt.close()
-    print('Done', flush=True)
-
-
-
-    # mask = mask[0, 0, :, :, :].transpose((2, 1, 0))
-    # gfp = image[mask > 0]
-    # gfp = np.array(gfp[:, 1]) / 2 ** 16
-    #
-    # # plt.figure()
-    # # plt.hist(gfp, bins=100, range=[0.00000001, 1])
-    # # plt.axvline(gfp.mean(),c='r', linestyle='-')
-    # # plt.xlabel('GFP Intensity (excludes 0)')
-    # # plt.ylabel('Occurrence (px)')
-    # # plt.title(path, fontdict={'fontsize': 8})
-    # # plt.savefig('hist1.png')
-    # # plt.show()
-    #
-    # plt.figure()
-    # plt.hist(gfp, bins=100, range=[0, 1])
-    # plt.axvline(gfp.mean(), c='r', linestyle='-')
-    # plt.xlabel('GFP Intensity')
-    # plt.ylabel('Occurrence (px)')
-    # plt.title(path, fontdict={'fontsize': 8})
-    # plt.savefig('hist2.png')
-    # plt.show()
-
-    # mask = utils.reconstruct_segmented('/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/' + newfolder)
-    #
-    # print('Saving Segment Image...', end='')
-    # io.imsave('test_segment.tif', mask[0,0,:,:,:].transpose((2, 1, 0)))
-    # print('Done!')
-    #
-    # #
-    # for i in range(distance.shape[-1]):
-    #     fig, ax = plt.subplots(1,2)
-    #     fig.set_size_inches(18.5, 10.5)
-    #     ax[0].imshow(np.array(distance[0,0,:,:,i]/distance.max(),dtype=np.float))
-    #     ax[1].imshow(np.array(unique_mask[0,0,:,:,i]/distance.max(),dtype=np.float))
-    #
-    #     plt.show()
-
-    files = glob.glob('maskfiles/' + newfolder + '/*')
-    for file in files:
-        os.remove(file)
-    os.rmdir('maskfiles/' + newfolder)
-    ray.shutdown()
     return mask, unique_mask, cell_list, image
 
+
 if __name__ =='__main__':
-    analyze()
+
+    base = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
+    newfolder = time.strftime('%y%m%d%H%M')
+    path_chunk = base+newfolder
+    os.mkdir(base + newfolder)
+
+    try:
+        analyze(path=None, numchunks=3, save_plots=True, show_plots=True, path_chunk_storage=path_chunk)
+
+    except:
+        files = glob.glob(path_chunk+'/*')
+        for file in files:
+            os.remove(file)
+        os.rmdir(path_chunk)
+        raise RuntimeError('Error in analysis Script - Chunk Files have been removed.')
+
+    files = glob.glob(path_chunk + '/*')
+    for file in files:
+        os.remove(file)
+    os.rmdir(path_chunk)

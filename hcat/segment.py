@@ -339,7 +339,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
-        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + 2] = int(unique_cell_id) + 4
+        for i in range(1):
+            seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + i] = int(unique_cell_id)
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map
@@ -390,18 +391,18 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # distance_expanded[distance_expanded < .2] = 0
 
             # EXPERIMENTAL
-            for i in range(5):
+            for i in range(15):
                 mask_expanded = skimage.morphology.binary_dilation(mask_expanded)
             seed_slice_expanded[distance_expanded < 0.1] = 1
 
-
+            # distance_expanded[distance_expanded < 0.1]=0
             # Run the watershed algorithm
             # Seems to help when you square the distance function... creates steeper gradients????
             # compactness  > 0.8 is too much
-
+            # Best is .03
             labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=.03)
+                                                    watershed_line=True, compactness=0.03)
 
             labels_expanded[labels_expanded == 1] = 0
 

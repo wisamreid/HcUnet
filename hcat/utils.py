@@ -136,7 +136,9 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
     image = skimage.morphology.binary_closing(image)
 
-    for i in range(1):
+    image = skimage.morphology.diameter_closing(image, 10)
+
+    for i in range(5):
         image = skimage.morphology.binary_erosion(image)
 
     image = skimage.morphology.skeletonize(image)
