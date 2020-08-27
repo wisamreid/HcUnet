@@ -136,10 +136,11 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
     image = skimage.morphology.binary_closing(image)
 
-    for i in range(10):
+    for i in range(1):
         image = skimage.morphology.binary_erosion(image)
 
     image = skimage.morphology.skeletonize(image)
+
 
     # first reshape to a logical image format and do a max project
     if image.ndim > 2:
@@ -148,7 +149,7 @@ def get_cochlear_length(image, calibration, diagnostics=False):
         image = skimage.filters.gaussian(image, sigma=2) > .5
         image = skimage.morphology.binary_erosion(image)
 
-    center_of_mass = np.array(scipy.ndimage.center_of_mass(image)) + 50
+    center_of_mass = np.array(scipy.ndimage.center_of_mass(image)) - 15
 
     # Turn the binary image into a list of points for each pixel that isnt black
     x, y = image.nonzero()
@@ -172,6 +173,7 @@ def get_cochlear_length(image, calibration, diagnostics=False):
     ind = theta.argsort()[1:-1:1]
     theta = theta[ind]
     r = r[ind]
+
 
     # run a spline in spherical space after sorting to get a best approximated fit
     tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=0.004, k=3)
@@ -372,8 +374,8 @@ def show_box_pred(image, output,thr=.90):
         plt.plot([x1,x1],[y1,y2],c[labels[i]], lw=0.5)
         plt.plot([x2,x2],[y1,y2],c[labels[i]], lw=0.5)
 
-    plt.savefig('test.png',dp=1000)
-    plt.show()
+    # plt.savefig('test.png',dp=1000)
+    # plt.show()
 
 
 def show_box_pred_simple(image, boxes):
@@ -398,8 +400,8 @@ def show_box_pred_simple(image, boxes):
         plt.plot([x1,x1],[y1,y2],'r', lw=0.5)
         plt.plot([x2,x2],[y1,y2],'r', lw=0.5)
 
-    plt.savefig('test.png',dp=1000)
-    plt.show()
+    # plt.savefig('test.png',dp=1000)
+    # plt.show()
 
 
 def construct_instance_mask(cell_list: list, mask):

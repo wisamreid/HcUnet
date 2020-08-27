@@ -79,7 +79,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
     for x in x_ind:
         for y in y_ind:
             for z in z_ind:
-                print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='')
+                print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='', flush=True)
 
                 # t.to_tensor reshapes image to [B C X Y Z]!!!
                 padded_image_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z[0]:z[1]].float().to(device)
@@ -87,8 +87,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
                 # Occasionally everything is just -1 in the whole mat. Skip for speed
                 if (padded_image_slice.float() != -1).sum() == 0:
                     iterations += 1
-                    for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
-                        print('\b \b', end='')
+                    print('\b \b' * len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
                     continue
 
                 # Evaluate Unet with no grad for speed
@@ -128,8 +127,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
                                        f'\npadded_image_slice.shape{padded_image_slice.shape} ')
 
                 iterations += 1
-                for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
-                    print('\b \b', end='')
+                print('\b \b'*len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
 
     return mask
 
@@ -181,7 +179,7 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
                 for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
 
                     info_string = f'{" "*len(str(total_iter))}{iter}/{total_iter}'
-                    print(info_string, end='')
+                    print(info_string, end='', flush=True)
 
                     # Take a mini chunk out of the original image
                     image_z_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z]
@@ -239,6 +237,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
         PAD_SIZE = [100, 100]
         EVAL_IMAGE_SIZE = [512, 512]
 
+    # If the pad + eval image size is larger than the image, just set the pad to 1, and the eval to the im size
     for dim, ps in enumerate(EVAL_IMAGE_SIZE):
         dim += 2
         shape = image.shape
@@ -250,7 +249,10 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     iterations = 0
     unique_cell_id = 2 # 1 is reserved for background
     cells = []
-    expand_z = 4
+    expand_z = 1 # dialate the z to try and account for nonisotropic zstacks
+    if expand_z < 1:
+        raise ValueError('Cant expand by less than 1.... you goon...')
+
 
     im_shape = predicted_semantic_mask.shape[2::]
     x_ind = utils.calculate_indexes(PAD_SIZE[0], EVAL_IMAGE_SIZE[0], im_shape[0], predicted_semantic_mask.shape[2])
@@ -337,13 +339,13 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
-        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + 2] = int(unique_cell_id)
+        seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + 2] = int(unique_cell_id) + 4
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map
     for x in x_ind:
         for y in y_ind:
-            print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='')
+            print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='', flush=True)
             
             # Take a slice for evaluation
             mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
@@ -378,11 +380,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # We manually correct for this by copying z slices and expanding the z dim
             for i in range(distance.shape[4]):
                 for j in range(expand_z):
-                    if j != 0:
-                        val=2
-                    else:
-                        val=1
-                    distance_expanded[:, :, (expand_z * i + j)] = distance[0, 0, :, :, i] ** val
+                    distance_expanded[:, :, (expand_z * i + j)] = distance[0, 0, :, :, i]
                     seed_slice_expanded[:, :, (expand_z * i + j)] = seed_slice[0, 0, :, :, i]
                     mask_expanded[:, :, (expand_z * i + j)] = mask_slice_binary[0, 0, :, :, i]
 
@@ -432,8 +430,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # Increment iterations
             iterations += 1
-            for _ in f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}':
-                print('\b \b', end='')
+            print('\b \b' * len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
 
     return unique_mask, seed
 
@@ -464,13 +461,13 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
     indicies = np.indices(unique_mask.shape) # Should be 3xMxN
     cell_list = []
     num_cells = len(cell_ids)
-    print(' ',end='')
+    print(' ',end='', flush=True)
 
     for i, id in enumerate(cell_ids):
         if id == 0:
             continue
         s = f'{i}/{num_cells}'
-        print(s, end='')
+        print(s, end='', flush=True)
 
         mask = (unique_mask == id)
         x_ind = indicies[0, :, :, :][mask]
@@ -489,7 +486,7 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
 
         cell = HairCell(image_coords=image_coords, center=center, image=image_slice, mask=mask, id=id)
         cell_list.append(cell)
-        print('\b \b'*(len(s)-1)  , end='')
-        print('\b',end='')
+        print('\b \b'*(len(s)-1) , end='')
+        print('\b', end='')
 
     return cell_list

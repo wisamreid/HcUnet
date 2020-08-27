@@ -1,7 +1,6 @@
 import os
 import glob
-from main import analyze
-
+from hcat.main import analyze
 
 path = '/media/chris/Padlock_3/ToAnalyze/'
 image_files = glob.glob(path + '*.tif')
@@ -20,6 +19,7 @@ for image_loc in image_files:
         print(f'ERROR: {image_loc}, continuing...')
         continue
     analyze(image_loc)
-    os.chdir('../..')
+    os.chdir('..')
+    print('')
 
 
