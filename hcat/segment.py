@@ -402,7 +402,12 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Best is .03
             labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=0.03)
+                                                    watershed_line=True, compactness=0.3)
+
+            #Hminima
+            # A/B test between matlab watershed and skimage
+            # train unet to predict distance map not the class label
+
 
             labels_expanded[labels_expanded == 1] = 0
 

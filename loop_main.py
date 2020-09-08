@@ -18,7 +18,7 @@ for image_loc in image_files:
     except:
         print(f'ERROR: {image_loc}, continuing...')
         continue
-    analyze(image_loc)
+    analyze(image_loc, save_plots=True, path_chunk_storage='./maskfiles/')
     os.chdir('..')
     print('')
 

@@ -268,7 +268,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         plt.ylabel('Occurrence (cells)')
         plt.title(path, fontdict={'fontsize': 8})
         if save_plots:
-            plt.savefig('~/Documents/HcUnetIm/hist0_all_colors.png')
+            plt.savefig('hist0_all_colors.png')
         if show_plots:
             plt.show()
         plt.close()

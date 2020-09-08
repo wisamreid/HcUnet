@@ -6,7 +6,7 @@ import numpy as np
 import copy
 import glob
 import skimage.io as io
-
+import cv2
 
 # DECORATOR
 def joint_transform(func):
@@ -606,3 +606,15 @@ class add_junk_image:
                 continue
 
         return image, boxes
+
+
+def distance_transform(image):
+
+    #Assume image is in a standard state from io.imread [Z, Y/X, X/Y, C]
+
+    distance = np.zeros(image.shape, dtype=np.float)
+
+    for i in range(image.shape[0]):
+        distance[i, :, :, :] = cv2.distanceTransform(image[i, :, :, :], cv2.DIST_L2, 5)
+
+    return distance
