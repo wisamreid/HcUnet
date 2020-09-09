@@ -50,7 +50,8 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                      groups=2).to(device)
 
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
-    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_1.unet')
     # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
     unet.eval()
@@ -113,12 +114,13 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 
             # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
             print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
+            print(f'STATS: {predicted_semantic_mask.numpy().max()}, {predicted_semantic_mask.numpy().min()} ')
 
             unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                         predicted_cell_candidate_list,
                                                                                         image_slice,
                                                                                         cell_prob_threshold=0.3,
-                                                                                        mask_prob_threshold=0.3)
+                                                                                        mask_prob_threshold=0.15)
 
             print('Done', flush=True)
 

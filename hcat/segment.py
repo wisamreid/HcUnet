@@ -362,6 +362,10 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Context aware probability map
             # If true, watershed is done on the probability map, distance is now probability
             if USE_PROB_MAP:
+                # Experimetnal
+                mask_slice -= np.min(mask_slice)
+                mask_slice /= np.max(mask_slice)
+
                 mask_slice_binary = mask_slice > mask_prob_threshold
                 distance[0, 0, :, :, :] = mask_slice[0, 0, :, :, :]
                 
@@ -393,7 +397,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # EXPERIMENTAL
             for i in range(15):
                 mask_expanded = skimage.morphology.binary_dilation(mask_expanded)
-            seed_slice_expanded[distance_expanded < 0.1] = 1
+
+            seed_slice_expanded[distance_expanded < 0.15] = 1
 
             # distance_expanded[distance_expanded < 0.1]=0
             # Run the watershed algorithm
@@ -402,7 +407,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Best is .03
             labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=0.3)
+                                                    watershed_line=True, compactness=0.04)
 
             #Hminima
             # A/B test between matlab watershed and skimage

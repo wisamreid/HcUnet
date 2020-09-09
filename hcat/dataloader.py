@@ -45,15 +45,19 @@ class Stack(Dataset):
         self.mask = []
         self.pwl = []
 
+        print('Warning using distance trasnform on mask....')
+
         for mask_path in self.files:
             file_with_mask = os.path.splitext(mask_path)[0]
             image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
             pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
             self.image.append(io.imread(image_data_path))
+
             try:
-                self.mask.append(io.imread(mask_path)[:, :, :, 0])
+                # EXPERIMENTAL DISTANCE TRANSFORM
+                self.mask.append(t.distance_transform(io.imread(mask_path))[:, :, :, 0])
             except IndexError:
-                self.mask.append(io.imread(mask_path))
+                self.mask.append(t.distance_transform(io.imread(mask_path)))
 
             self.pwl.append(io.imread(pwl_data_path))
 

@@ -6,6 +6,7 @@ import numpy as np
 import copy
 import glob
 import skimage.io as io
+import skimage.morphology
 import cv2
 
 # DECORATOR
@@ -609,12 +610,27 @@ class add_junk_image:
 
 
 def distance_transform(image):
+    """
+    Distance transform over z plane for the 3d volume by only going each z stack
+    Meant for segmentation mask target.
 
-    #Assume image is in a standard state from io.imread [Z, Y/X, X/Y, C]
+    :param image: np.ndarray [z, x, y, c]
+    :return: distance mat of image with shape [z, x, y, c]
+    """
+    #Assume image is in a standard state from io.imread [Z, Y/X, X/Y, C?]
+
+    if not isinstance(image, np.ndarray):
+        raise ValueError(f'Image must be a numpy ndarray, not {type(image)}...')
+    if image.dtype != np.uint8:
+        raise ValueError(f'Image dtype is not int: {image.dtype}')
 
     distance = np.zeros(image.shape, dtype=np.float)
+    image = skimage.morphology.binary_dilation(image)
 
-    for i in range(image.shape[0]):
-        distance[i, :, :, :] = cv2.distanceTransform(image[i, :, :, :], cv2.DIST_L2, 5)
-
+    if image.ndim == 4:
+        for i in range(image.shape[0]):
+            distance[i, :, :, :] = cv2.distanceTransform(image[i, :, :, :].astype(np.uint8), cv2.DIST_L2, 5)
+    else:
+        for i in range(image.shape[0]):
+            distance[i, :, :] = cv2.distanceTransform(image[i, :, :].astype(np.uint8), cv2.DIST_L2, 5)
     return distance

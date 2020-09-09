@@ -110,3 +110,28 @@ def dice(pred: torch.Tensor, mask: torch.Tensor):
     loss = (2 * (pred * mask).sum() + 1e-10) / ((pred + mask).sum() + 1e-10)
 
     return 1-loss
+
+def L1Loss(pred: torch.Tensor, mask: torch.Tensor):
+    """
+    Calculates the dice loss between pred and mask
+
+    :param pred: torch.Tensor | probability map of shape [B,C,X,Y,Z] predicted by hcat.unet
+    :param mask: torch.Tensor | ground truth probability map of shape [B, C, X+dx, Y+dy, Z+dz] that will be cropped
+                 to identical size of pred
+    :return: torch.float | calculated dice loss
+    """
+
+    pred_shape = pred.shape
+    n_dim = len(pred_shape)
+
+    if n_dim == 5:
+        mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1, 0:pred_shape[4]:1]
+    elif n_dim == 4:
+        mask = mask[:, :, 0:pred_shape[2]:1, 0:pred_shape[3]:1]
+    else:
+        raise IndexError(f'Unexpected number of predicted mask dimensions. Expected 4 (2D) or 5 (3D) but got' +
+                         f' {n_dim} dimensions: {pred_shape}')
+
+    loss_fn = torch.nn.L1Loss()
+
+    return loss_fn(pred, mask)
