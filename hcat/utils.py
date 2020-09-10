@@ -2,6 +2,8 @@ import torch
 import torchvision.ops
 
 import numpy as np
+from numba import njit
+from numba import prange
 
 import skimage
 import skimage.exposure
@@ -116,7 +118,7 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
     return ind
 
 
-def get_cochlear_length(image, calibration, diagnostics=False):
+def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
 
     #JUST DO IT ON THE MASK YOU BOOB. WONT HAVE TO WORRY ABOUT NONSENSE THRESHOLDING
 
@@ -195,7 +197,7 @@ def get_cochlear_length(image, calibration, diagnostics=False):
         if i == 0:
             base = coord
             equal_spaced_points.append(base)
-        if np.sqrt((base[0] - coord[0])**2 + (base[1] - coord[1])**2) > calibration:
+        if np.sqrt((base[0] - coord[0])**2 + (base[1] - coord[1])**2) > equal_spaced_distance:
             equal_spaced_points.append(coord)
             base = coord
 
@@ -420,3 +422,55 @@ def construct_instance_mask(cell_list: list, mask):
         unique_mask[0, 0, index[0]:index[2], index[1]:index[3], :][cell_mask > 0] = cell_mask[cell_mask > 0]
 
     return unique_mask
+
+
+@njit(parallel=True)
+def mask_to_lines(image:np.ndarray):
+    """
+    njit function for removing inner bits of segmentation mask
+    Usefull if you only want an OUTLINE of the mask for overlay on the actuall image
+
+
+    :param image:
+    :return: zero_ind: boolean array of index's
+    """
+    y_lim = image.shape[-2]
+    x_lim = image.shape[-3]
+    x_ = x_lim-1
+    y_ = y_lim-1
+    ind = np.zeros(image.shape, dtype=np.bool_)
+
+    # Loop over every pixel in image, if it isnt zero and matches its neightbors make ind TRUE
+    # We'll remove True ind's later
+
+    for z in prange(image.shape[-1]):
+        for y in range(y_lim):
+            if y == 0 or y == y_:
+                continue
+            for x in range(x_lim):
+                if x == 0 or x == x_:
+                    continue
+
+                pix = image[0,0,x,y,z]
+                if pix == 0:
+                    continue
+
+                left = image[0, 0, x-1, y, z]
+                right = image[0, 0, x + 1, y, z]
+                top = image[0, 0, x, y - 1, z]
+                bottom = image[0, 0, x, y + 1, z]
+
+                ind[0,0,x,y,z] = (left == pix and right == pix and top == pix and bottom == pix)
+
+    return ind
+
+
+def color_from_ind(i):
+    """
+    Take in some number and always generate a unique color from that number.
+    Quick AF
+    :param i:
+    :return:
+    """
+    np.random.seed(i)
+    return np.random.random(4)/.5

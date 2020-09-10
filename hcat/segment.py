@@ -46,7 +46,7 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
     _eval_im_size = {'4': (128, 128, 6),  # In GB
                      '6': (300, 300, 6),
                      '8': (300, 300, 10),
-                     '11': (300, 300, 15)}
+                     '11': (400, 400, 15)}
     if hcat.__CUDA_MEM__:
         PAD_SIZE = (128, 128, 10)
         EVAL_IMAGE_SIZE = _eval_im_size[str(int(np.floor(hcat.__CUDA_MEM__/1e9)))]
@@ -56,8 +56,6 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
 
     mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.float)
     im_shape = image.shape
-
-    cell_candidates = None
 
     # inf and nan screw up model evaluation. Happens occasionally. Remove them!
     image[np.isnan(image)] = 0
@@ -76,58 +74,59 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
 
     # Loop and apply unet
     # (x,y,z)_ind are lists of lists [[0,100], [100,200], ... ]
-    for x in x_ind:
-        for y in y_ind:
-            for z in z_ind:
-                print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='', flush=True)
+    with torch.no_grad():
+        for z in z_ind:
+            for x in x_ind:
+                for y in y_ind:
+                    print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='', flush=True)
 
-                # t.to_tensor reshapes image to [B C X Y Z]!!!
-                padded_image_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z[0]:z[1]].float().to(device)
+                    # t.to_tensor reshapes image to [B C X Y Z]!!!
+                    padded_image_slice = image[:, :, x[0]:x[1], y[0]:y[1]:, z[0]:z[1]].float().to(device)
 
-                # Occasionally everything is just -1 in the whole mat. Skip for speed
-                if (padded_image_slice.float() != -1).sum() == 0:
-                    iterations += 1
-                    print('\b \b' * len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
-                    continue
+                    # Occasionally everything is just -1 in the whole mat. Skip for speed
+                    if (padded_image_slice.float() == -1).all():
+                        iterations += 1
+                        print('\b \b' * len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
+                        continue
 
-                # Evaluate Unet with no grad for speed
-                with torch.no_grad():
+                    # Evaluate Unet with no grad for speed
+
                     valid_out = unet(padded_image_slice)
 
-                # Unet cuts off bit of the image. It is unavoidable so we add padding to either side
-                # We need to remove padding from the output of unet to get a "Valid" segmentation
-                valid_out = valid_out[:,:,
-                                     PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
-                                     PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
-                                     PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
+                    # Unet cuts off bit of the image. It is unavoidable so we add padding to either side
+                    # We need to remove padding from the output of unet to get a "Valid" segmentation
+                    valid_out = valid_out[:,:,
+                                         PAD_SIZE[0]:EVAL_IMAGE_SIZE[0]+PAD_SIZE[0],
+                                         PAD_SIZE[1]:EVAL_IMAGE_SIZE[1]+PAD_SIZE[1],
+                                         PAD_SIZE[2]:EVAL_IMAGE_SIZE[2]+PAD_SIZE[2]]
 
-                # Perform an in place sigmoid function to save memory.
-                # 1/ (1+exp(-x))
-                valid_out.mul_(-1)
-                valid_out.exp_()
-                valid_out.add_(1)
-                valid_out.pow_(-1)
+                    # Perform an in place sigmoid function to save memory.
+                    # 1/ (1+exp(-x))
+                    valid_out.mul_(-1)
+                    valid_out.exp_()
+                    valid_out.add_(1)
+                    valid_out.pow_(-1)
 
-                # Take pixels that are greater than 75% likely to be a cell.
-                if not use_probability_map:
-                    valid_out.gt_(mask_cell_prob_threshold)  # Greater Than
-                    valid_out = valid_out.type(torch.uint8)
-                    if mask.dtype != torch.uint8:
-                        mask = mask.type(torch.uint8)
+                    # Take pixels that are greater than 75% likely to be a cell.
+                    if not use_probability_map:
+                        valid_out.gt_(mask_cell_prob_threshold)  # Greater Than
+                        valid_out = valid_out.type(torch.uint8)
+                        if mask.dtype != torch.uint8:
+                            mask = mask.type(torch.uint8)
 
-                # Add the valid unet segmentation to the larger mask matrix
-                try:
-                    mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
-                               y[0]:y[0]+EVAL_IMAGE_SIZE[1],
-                               z[0]:z[0]+EVAL_IMAGE_SIZE[2]] = valid_out
-                except IndexError:
-                    raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
-                except RuntimeError:
-                    raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} '
-                                       f'\npadded_image_slice.shape{padded_image_slice.shape} ')
+                    # Add the valid unet segmentation to the larger mask matrix
+                    try:
+                        mask[:, :, x[0]:x[0]+EVAL_IMAGE_SIZE[0],
+                                   y[0]:y[0]+EVAL_IMAGE_SIZE[1],
+                                   z[0]:z[0]+EVAL_IMAGE_SIZE[2]] = valid_out
+                    except IndexError:
+                        raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} ')
+                    except RuntimeError:
+                        raise RuntimeError(f'Amount of padding is not sufficient.\nvalid_out.shape: {valid_out.shape}\neval_image_size: {EVAL_IMAGE_SIZE} '
+                                           f'\npadded_image_slice.shape{padded_image_slice.shape} ')
 
-                iterations += 1
-                print('\b \b'*len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
+                    iterations += 1
+                    print('\b \b'*len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
 
     return mask
 
@@ -174,9 +173,9 @@ def predict_cell_candidates(image, model, candidate_list = None, initial_coords=
 
     # Loop through everything!
     with torch.no_grad():
-        for x in x_ind:
-            for y in y_ind:
-                for z in range(image.shape[-1]): # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
+        for z in range(image.shape[-1]):  # ASSUME TORCH VALID IMAGES [B, C, X, Y, Z]
+            for x in x_ind:
+                for y in y_ind:
 
                     info_string = f'{" "*len(str(total_iter))}{iter}/{total_iter}'
                     print(info_string, end='', flush=True)
@@ -231,11 +230,11 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     # Define some useful stuff
     # Get memory usage - May need to fine tune later
     if np.round(hcat.__CPU_MEM__/1e9) >= 16:
-        PAD_SIZE = [100, 100]
-        EVAL_IMAGE_SIZE = [1024, 1024]
+        PAD_SIZE = [128, 128]
+        EVAL_IMAGE_SIZE = [912, 912]
     else:
-        PAD_SIZE = [100, 100]
-        EVAL_IMAGE_SIZE = [512, 512]
+        PAD_SIZE = [64, 64]
+        EVAL_IMAGE_SIZE = [412, 412]
 
     # If the pad + eval image size is larger than the image, just set the pad to 1, and the eval to the im size
     for dim, ps in enumerate(EVAL_IMAGE_SIZE):
@@ -339,7 +338,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
-        for i in range(1):
+        for i in range(3):
             seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + i] = int(unique_cell_id)
         unique_cell_id += 1
     
@@ -363,8 +362,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # If true, watershed is done on the probability map, distance is now probability
             if USE_PROB_MAP:
                 # Experimetnal
-                mask_slice -= np.min(mask_slice)
-                mask_slice /= np.max(mask_slice)
+                # mask_slice -= np.min(mask_slice)
+                # mask_slice /= np.max(mask_slice)
 
                 mask_slice_binary = mask_slice > mask_prob_threshold
                 distance[0, 0, :, :, :] = mask_slice[0, 0, :, :, :]
@@ -407,7 +406,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             # Best is .03
             labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=0.04)
+                                                    watershed_line=True, compactness=0.05)
 
             #Hminima
             # A/B test between matlab watershed and skimage

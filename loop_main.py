@@ -1,8 +1,9 @@
 import os
 import glob
 from hcat.main import analyze
-
-path = '/media/chris/Padlock_3/ToAnalyze/'
+import torch
+import gc
+path = '/media/chris/Padlock_3/ToAnalyzeGain/'
 image_files = glob.glob(path + '*.tif')
 os.chdir(path)
 
@@ -18,8 +19,13 @@ for image_loc in image_files:
     except:
         print(f'ERROR: {image_loc}, continuing...')
         continue
-    analyze(image_loc, save_plots=True, path_chunk_storage='./maskfiles/')
+    try:
+        analyze(image_loc, numchunks=6, save_plots=True, path_chunk_storage='./maskfiles/')
+    except RuntimeError:
+        analyze(image_loc, numchunks=5, save_plots=True, path_chunk_storage='./maskfiles/')
     os.chdir('..')
     print('')
+    gc.collect(2)
+    torch.cuda.empty_cache()
 
 

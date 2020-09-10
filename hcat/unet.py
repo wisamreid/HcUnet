@@ -137,7 +137,8 @@ class Unet_Constructor(nn.Module):
 
         x = self.out_conv(x)
 
-        outputs = None  # Do this to clear memory
+        # outputs = None  # Do this to clear memory
+        del outputs
 
         return x
 

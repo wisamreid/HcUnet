@@ -29,7 +29,7 @@ def renamed_loads(pickled_bytes):
     file_obj = io.BytesIO(pickled_bytes)
     return renamed_load(file_obj)
 
-path = '/media/chris/Padlock_3/ToAnalyze/'
+path = '/media/chris/Padlock_3/ToAnalyzeGain/'
 
 folders = sorted(glob.glob(path+'*_cellBycell/'))
 

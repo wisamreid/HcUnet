@@ -10,7 +10,9 @@ import pickle
 import time
 import glob
 import skimage.filters
-
+import skimage.morphology
+import matplotlib.colors
+import tifffile
 
 def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chunk_storage=None):
 
@@ -50,8 +52,8 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                      groups=2).to(device)
 
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
-    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
-    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_1.unet')
+    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_1.unet')
     # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
     unet.eval()
@@ -114,15 +116,30 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 
             # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
             print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
-            print(f'STATS: {predicted_semantic_mask.numpy().max()}, {predicted_semantic_mask.numpy().min()} ')
 
             unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                         predicted_cell_candidate_list,
                                                                                         image_slice,
                                                                                         cell_prob_threshold=0.3,
                                                                                         mask_prob_threshold=0.15)
-
             print('Done', flush=True)
+
+            print(f'\tRemoving outlines and saving new chunk image...',end='')
+            ind = utils.mask_to_lines(unique_mask)
+            test = np.copy(unique_mask)
+            test[ind] = 0
+            # TZCYXS order
+            uni = np.unique(test)
+            uni = uni[uni!=0]
+            for u in uni:
+                color = utils.color_from_ind(u)
+                for c in range(image_slice.shape[1]):
+                    image_slice[0,c,:,:,:][test[0,0,:,:,:]==u] = color[c]
+            # tifffile.imwrite('path/to/temp.ome.tiff', data_0, imagej=True)
+            tifffile.imsave('test_outline.tif', image_slice[0,[3,2,0],:,:,:].numpy().transpose((3,0,2,1)))
+            print('Done')
+
+
 
             print(f'\tAssigning cell objects:', end=' ', flush=True)
             cell_list = hcat.generate_cell_objects(image_slice, unique_mask, cell_candidates=predicted_cell_candidate_list,
@@ -134,7 +151,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             if show_plots or save_plots:
                 if len(predicted_cell_candidate_list['scores']) > 0:
                     plt.figure(figsize=(20, 20))
-                    utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 7], [predicted_cell_candidate_list], .5)
+                    utils.show_box_pred(predicted_semantic_mask[0, :, :, :, 7], [predicted_cell_candidate_list], .3)
                     if save_plots:
                         plt.savefig(f'chunk{i}_{j}.tif')
                     if show_plots:
@@ -194,7 +211,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         mask.gt_(.5)
         mask = mask.numpy()
 
-    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask[0,0,:,:,:].sum(-1) > 5, calibration=2)
+    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask[0,0,:,:,:].sum(-1) > 8, equal_spaced_distance=2)
     print('Done', flush=True)
 
     print(f'Assigning freq to cell...', end=' ', flush=True)
