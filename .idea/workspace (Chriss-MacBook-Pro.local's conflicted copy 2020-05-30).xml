@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="3c25883d-baa3-428b-af02-f8501a3ee5dc" name="Default Changelist" comment="Added util">
+      <change afterPath="$PROJECT_DIR$/haircell.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/train_fasterrcnn.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Unet.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/Unet.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataloader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/loss.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/transforms.py" beforeDir="false" afterPath="$PROJECT_DIR$/transforms.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/unet.py" beforeDir="false" afterPath="$PROJECT_DIR$/unet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <list>
+        <option value="buswinka &lt;43152334+buswinka@users.noreply.github.com&gt;" />
+      </list>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="UPDATE_TYPE" value="MERGE" />
+  </component>
+  <component name="JupyterTrust" id="4cbc2b83-9851-412e-a599-f136b9f040e6" />
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="vv2xar4a" />
+  </component>
+  <component name="ProjectId" id="1aMNcf2C93SUt79wnCrI4Slbcit" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="restartRequiresConfirmation" value="false" />
+    <property name="settings.editor.selected.configurable" value="terminal" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/TrainedModels" />
+      <recent name="$PROJECT_DIR$/Images" />
+      <recent name="$PROJECT_DIR$/DepreciatedFiles" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.train fasterrcnn">
+    <configuration name="data_load_test" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/data_load_test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="dataloader" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataloader.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="figures" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/figures.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="true" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="generate_mask" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/envs/py38/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/generate_mask.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="true" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="test" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="train fasterrcnn" type="PythonConfigurationType" factoryName="Python">
+      <module name="HcUnet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/train_fasterrcnn.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Python.data_load_test" />
+      <item itemvalue="Python.figures" />
+      <item itemvalue="Python.generate_mask" />
+      <item itemvalue="Python.main" />
+      <item itemvalue="Python.test" />
+      <item itemvalue="Python.train fasterrcnn" />
+      <item itemvalue="Python.dataloader" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.dataloader" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="3c25883d-baa3-428b-af02-f8501a3ee5dc" name="Default Changelist" comment="" />
+      <created>1586541583470</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1586541583470</updated>
+      <workItem from="1586541587317" duration="112000" />
+      <workItem from="1586541743873" duration="9789000" />
+      <workItem from="1586707588694" duration="1860000" />
+      <workItem from="1586874226153" duration="466000" />
+      <workItem from="1586874703345" duration="10409000" />
+      <workItem from="1586960699592" duration="1413000" />
+      <workItem from="1586973429098" duration="12862000" />
+      <workItem from="1587051169342" duration="8657000" />
+      <workItem from="1587146218282" duration="3446000" />
+      <workItem from="1587497956871" duration="10842000" />
+      <workItem from="1587564223373" duration="3869000" />
+      <workItem from="1587605290488" duration="353000" />
+      <workItem from="1587608913323" duration="188000" />
+      <workItem from="1587611035077" duration="389000" />
+      <workItem from="1587649112642" duration="2631000" />
+      <workItem from="1587665691547" duration="9180000" />
+      <workItem from="1587755565652" duration="827000" />
+      <workItem from="1587757936147" duration="5504000" />
+      <workItem from="1587833074423" duration="741000" />
+      <workItem from="1587997524424" duration="164000" />
+      <workItem from="1587997699407" duration="6423000" />
+      <workItem from="1588006143079" duration="1617000" />
+      <workItem from="1588013304967" duration="10666000" />
+      <workItem from="1588083395717" duration="4319000" />
+      <workItem from="1588116678376" duration="3788000" />
+      <workItem from="1588120482738" duration="1820000" />
+      <workItem from="1588178301132" duration="7036000" />
+      <workItem from="1588190893029" duration="837000" />
+      <workItem from="1588192792040" duration="7022000" />
+      <workItem from="1588268793554" duration="11393000" />
+      <workItem from="1588609497464" duration="1243000" />
+      <workItem from="1588616701127" duration="12710000" />
+      <workItem from="1588635514180" duration="27924000" />
+      <workItem from="1588806451428" duration="6068000" />
+      <workItem from="1588862743725" duration="13158000" />
+      <workItem from="1588967510196" duration="925000" />
+      <workItem from="1589211307086" duration="187000" />
+      <workItem from="1589211534669" duration="6137000" />
+      <workItem from="1589233033198" duration="2703000" />
+      <workItem from="1589293394635" duration="2363000" />
+      <workItem from="1589296665940" duration="5335000" />
+      <workItem from="1589304551115" duration="9398000" />
+      <workItem from="1589385429324" duration="3566000" />
+      <workItem from="1589391055062" duration="2019000" />
+      <workItem from="1589395095633" duration="581000" />
+      <workItem from="1589395885656" duration="6821000" />
+      <workItem from="1589474338273" duration="5361000" />
+      <workItem from="1589668083412" duration="3934000" />
+      <workItem from="1590421045880" duration="1824000" />
+      <workItem from="1590507043614" duration="10064000" />
+      <workItem from="1590612189324" duration="2978000" />
+      <workItem from="1590638457302" duration="304000" />
+      <workItem from="1590639075664" duration="831000" />
+      <workItem from="1590710119276" duration="8652000" />
+      <workItem from="1590731180009" duration="7111000" />
+      <workItem from="1590797521309" duration="4376000" />
+      <workItem from="1590864021548" duration="700000" />
+      <workItem from="1590864745055" duration="14065000" />
+      <workItem from="1590882150283" duration="2000" />
+      <workItem from="1590882298543" duration="19000" />
+    </task>
+    <task id="LOCAL-00001" summary="Added Dice Loss, removed some unncessecary files to untracked folder">
+      <created>1586543111620</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1586543111620</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Added torch.abs to output of dice loss">
+      <created>1586543577347</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1586543577347</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="2" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="Added Dice Loss, removed some unncessecary files to untracked folder" />
+    <MESSAGE value="Added torch.abs to output of dice loss" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added torch.abs to output of dice loss" />
+    <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="245" y="147" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1590864549571">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="184" y="103" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1440.900@0.0.1440.900" timestamp="1586895593781" />
+    <state x="184" y="123" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.23.1440.877@0.23.1440.877" timestamp="1586975940804" />
+    <state x="245" y="145" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.25.1920.1055@0.25.1920.1055" timestamp="1588269386480" />
+    <state x="245" y="147" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1590864549571" />
+    <state x="580" y="330" width="632" height="394" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1588193235246">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state x="435" y="260" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1440.900@0.0.1440.900" timestamp="1586892761920" />
+    <state x="580" y="330" width="632" height="394" key="#com.intellij.fileTypes.FileTypeChooser/0.25.1920.1055@0.25.1920.1055" timestamp="1588193235246" />
+    <state x="408" y="204" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog" timestamp="1586973375069">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state x="408" y="204" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog/0.23.1440.877@0.23.1440.877" timestamp="1586973375069" />
+    <state x="286" y="40" width="982" height="798" key="CommitChangelistDialog2" timestamp="1586553147625">
+      <screen x="0" y="0" width="1440" height="900" />
+    </state>
+    <state x="286" y="40" key="CommitChangelistDialog2/0.0.1440.900@0.0.1440.900" timestamp="1586553147625" />
+    <state x="286" y="62" width="982" height="798" key="CommitChangelistDialog2/0.23.1440.877@0.23.1440.877" timestamp="1586543577205" />
+    <state x="579" y="252" width="424" height="482" key="FileChooserDialogImpl" timestamp="1590714302411">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="579" y="250" width="424" height="482" key="FileChooserDialogImpl/0.25.1920.1055@0.25.1920.1055" timestamp="1588269324234" />
+    <state x="579" y="252" width="424" height="482" key="FileChooserDialogImpl/0.27.1920.1053@0.27.1920.1053" timestamp="1590714302411" />
+    <state width="1874" height="276" key="GridCell.Tab.0.bottom" timestamp="1590880984749">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="1398" height="245" key="GridCell.Tab.0.bottom/0.0.1440.900@0.0.1440.900" timestamp="1586547212962" />
+    <state width="1398" height="285" key="GridCell.Tab.0.bottom/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state width="914" height="277" key="GridCell.Tab.0.bottom/0.25.1920.1055@0.25.1920.1055" timestamp="1588994573203" />
+    <state width="1874" height="276" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1590880984749" />
+    <state width="1874" height="276" key="GridCell.Tab.0.center" timestamp="1590880984749">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="1398" height="245" key="GridCell.Tab.0.center/0.0.1440.900@0.0.1440.900" timestamp="1586547212962" />
+    <state width="1398" height="285" key="GridCell.Tab.0.center/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state width="914" height="277" key="GridCell.Tab.0.center/0.25.1920.1055@0.25.1920.1055" timestamp="1588994573203" />
+    <state width="1874" height="276" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1590880984749" />
+    <state width="1874" height="276" key="GridCell.Tab.0.left" timestamp="1590880984749">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="1398" height="245" key="GridCell.Tab.0.left/0.0.1440.900@0.0.1440.900" timestamp="1586547212961" />
+    <state width="1398" height="285" key="GridCell.Tab.0.left/0.23.1440.877@0.23.1440.877" timestamp="1586541985625" />
+    <state width="914" height="277" key="GridCell.Tab.0.left/0.25.1920.1055@0.25.1920.1055" timestamp="1588994573203" />
+    <state width="1874" height="276" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1590880984749" />
+    <state width="1874" height="276" key="GridCell.Tab.0.right" timestamp="1590880984749">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="1398" height="245" key="GridCell.Tab.0.right/0.0.1440.900@0.0.1440.900" timestamp="1586547212962" />
+    <state width="1398" height="285" key="GridCell.Tab.0.right/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state width="914" height="277" key="GridCell.Tab.0.right/0.25.1920.1055@0.25.1920.1055" timestamp="1588994573203" />
+    <state width="1874" height="276" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1590880984749" />
+    <state width="1398" height="285" key="GridCell.Tab.1.bottom" timestamp="1586541985627">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state width="1398" height="285" key="GridCell.Tab.1.bottom/0.23.1440.877@0.23.1440.877" timestamp="1586541985627" />
+    <state width="1398" height="285" key="GridCell.Tab.1.center" timestamp="1586541985626">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state width="1398" height="285" key="GridCell.Tab.1.center/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state width="1398" height="285" key="GridCell.Tab.1.left" timestamp="1586541985626">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state width="1398" height="285" key="GridCell.Tab.1.left/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state width="1398" height="285" key="GridCell.Tab.1.right" timestamp="1586541985626">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state width="1398" height="285" key="GridCell.Tab.1.right/0.23.1440.877@0.23.1440.877" timestamp="1586541985626" />
+    <state x="752" y="134" width="913" height="728" key="SettingsEditor" timestamp="1588117005524">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state x="221" y="89" key="SettingsEditor/0.0.1440.900@0.0.1440.900" timestamp="1587065314791" />
+    <state x="752" y="134" width="913" height="728" key="SettingsEditor/0.25.1920.1055@0.25.1920.1055" timestamp="1588117005524" />
+    <state x="295" y="131" key="SettingsEditor/0.27.1920.1053@0.27.1920.1053" timestamp="1587605613566" />
+    <state x="739" y="175" width="762" height="719" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser" timestamp="1590878022999">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="739" y="173" width="432" height="757" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser/0.25.1920.1055@0.25.1920.1055" timestamp="1588191185568" />
+    <state x="739" y="175" width="762" height="719" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser/0.27.1920.1053@0.27.1920.1053" timestamp="1590878022999" />
+    <state x="508" y="371" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2" timestamp="1586553131040">
+      <screen x="0" y="0" width="1440" height="900" />
+    </state>
+    <state x="508" y="371" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.0.1440.900@0.0.1440.900" timestamp="1586553131040" />
+    <state x="508" y="385" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.23.1440.877@0.23.1440.877" timestamp="1586543544616" />
+    <state x="1845" y="70" width="602" height="1009" key="dock-window-1" timestamp="1589521954558">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="100" y="100" width="1240" height="700" key="dock-window-1/0.0.1440.900@0.0.1440.900" timestamp="1586712469986" />
+    <state x="720" y="23" width="720" height="877" key="dock-window-1/0.23.1440.877@0.23.1440.877" timestamp="1587159942333" />
+    <state x="1722" y="224" width="792" height="1011" key="dock-window-1/0.25.1920.1055@0.25.1920.1055" timestamp="1588994570234" />
+    <state x="1845" y="70" width="602" height="1009" key="dock-window-1/0.27.1920.1053@0.27.1920.1053" timestamp="1589521954558" />
+    <state x="1478" y="218" width="615" height="695" key="dock-window-2" timestamp="1589395675854">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="1478" y="218" width="615" height="695" key="dock-window-2/0.27.1920.1053@0.27.1920.1053" timestamp="1589395675854" />
+    <state x="651" y="127" width="618" height="855" key="find.popup" timestamp="1587690107977">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state x="651" y="127" width="618" height="855" key="find.popup/0.25.1920.1055@0.25.1920.1055" timestamp="1587690107977" />
+    <state x="385" y="213" width="670" height="676" key="search.everywhere.popup" timestamp="1587517519276">
+      <screen x="0" y="23" width="1440" height="877" />
+    </state>
+    <state x="385" y="213" width="670" height="676" key="search.everywhere.popup/0.23.1440.877@0.23.1440.877" timestamp="1587517519276" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/HcUnet$dataloader.coverage" NAME="dataloader Coverage Results" MODIFIED="1587611185393" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/HcUnet$figures.coverage" NAME="figures Coverage Results" MODIFIED="1589671407373" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/HcUnet$test.coverage" NAME="test Coverage Results" MODIFIED="1590714270765" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/HcUnet$main.coverage" NAME="main Coverage Results" MODIFIED="1590881108804" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>
