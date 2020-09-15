@@ -43,19 +43,22 @@ def predict_segmentation_mask(unet, image, device, use_probability_map=False, ma
     # Check for total cuda memory to avoid overflow later
     # Define useful variables
     # Common GPU Memory Sizes (4, 6, 8, 11)
-    _eval_im_size = {'4': (128, 128, 6),  # In GB
-                     '6': (300, 300, 6),
-                     '8': (300, 300, 10),
-                     '11': (400, 400, 15)}
+    _eval_im_size = {'4': [128, 128, 6],  # In GB
+                     '6': [300, 300, 6],
+                     '8': [300, 300, 10],
+                     '11': [350, 350, 15]}
     if hcat.__CUDA_MEM__:
         PAD_SIZE = (128, 128, 10)
         EVAL_IMAGE_SIZE = _eval_im_size[str(int(np.floor(hcat.__CUDA_MEM__/1e9)))]
     else:
-        PAD_SIZE = (128, 128, 10)
-        EVAL_IMAGE_SIZE = (300, 300, 15)
+        PAD_SIZE = [128, 128, 10]
+        EVAL_IMAGE_SIZE = [300, 300, 15]
 
     mask = torch.zeros((1, 1, image.shape[2], image.shape[3], image.shape[4]), dtype=torch.float)
     im_shape = image.shape
+
+    if im_shape[4] < EVAL_IMAGE_SIZE[2]:
+        EVAL_IMAGE_SIZE[2] = im_shape[4]
 
     # inf and nan screw up model evaluation. Happens occasionally. Remove them!
     image[np.isnan(image)] = 0
@@ -230,8 +233,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     # Define some useful stuff
     # Get memory usage - May need to fine tune later
     if np.round(hcat.__CPU_MEM__/1e9) >= 16:
-        PAD_SIZE = [128, 128]
-        EVAL_IMAGE_SIZE = [912, 912]
+        PAD_SIZE = [56, 56]
+        EVAL_IMAGE_SIZE = [1212, 1212]
     else:
         PAD_SIZE = [64, 64]
         EVAL_IMAGE_SIZE = [412, 412]
@@ -248,7 +251,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
     iterations = 0
     unique_cell_id = 2 # 1 is reserved for background
     cells = []
-    expand_z = 1 # dialate the z to try and account for nonisotropic zstacks
+    expand_z = hcat.__expand_z__ # dialate the z to try and account for nonisotropic zstacks
     if expand_z < 1:
         raise ValueError('Cant expand by less than 1.... you goon...')
 
@@ -276,15 +279,28 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
         raise ValueError(f'Unknown predicted_semantic_mask dtype. {type(predicted_semantic_mask)}, '
                          f'{predicted_semantic_mask.dtype} ')
 
-
-
     z = predicted_cell_candidate_list['z_level'].cpu().numpy()
     prob = predicted_cell_candidate_list['scores'].cpu().numpy()
     z = z[prob > cell_prob_threshold]
+    prob = prob[prob > cell_prob_threshold]
 
     unique_z, counts = np.unique(z, return_counts=True)
-    i = np.argmax(counts)
-    best_z = unique_z[i]
+    best_z = 0
+    best_z_avg = 0
+    for uni in unique_z:
+        if prob[z==uni].mean() > best_z_avg:
+            best_z = uni
+            best_z_avg = prob[z==uni].mean()
+
+    # We seem to have issues with watershed when seed values are way different from each other???
+    # Sort by x0 to try and reduce this problem...
+    # Maybe didnt help all that much. Still pretty though, im going to leave it...
+    sorted, indices = torch.sort(predicted_cell_candidate_list['boxes'],dim=0)
+    for key in predicted_cell_candidate_list:
+        if predicted_cell_candidate_list[key].ndim == 2:
+            predicted_cell_candidate_list[key] = predicted_cell_candidate_list[key][indices[:,0], :]
+        else:
+            predicted_cell_candidate_list[key] = predicted_cell_candidate_list[key][indices[:, 0]]
 
     for i, (y1, x1, y2, x2) in enumerate(predicted_cell_candidate_list['boxes']):
 
@@ -296,9 +312,9 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             continue  # box is outside y dim
         elif predicted_cell_candidate_list['scores'][i] < cell_prob_threshold:
             continue  # box probability is lower than predefined threshold
-        elif predicted_cell_candidate_list['z_level'][i] < best_z-3:
+        elif predicted_cell_candidate_list['z_level'][i] < best_z-hcat.__z_tolerance__:
             continue  # box is on the wrong z plane within a tolerance
-        elif predicted_cell_candidate_list['z_level'][i] > best_z+3:
+        elif predicted_cell_candidate_list['z_level'][i] > best_z+hcat.__z_tolerance__:
             continue  # box is on the wrong z plane within a tolerance
 
         # in the cases where a box is clipping the outside, crop it to the edges
@@ -338,8 +354,11 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
-        for i in range(3):
-            seed[0, 0, int(np.round(x1+(x2-x1)/2)), int(np.round(y1+(y2-y1)/2)), int(best_z) + i] = int(unique_cell_id)
+        seed_square = 6
+        for i in range(seed_square):
+            for r0 in range(seed_square):
+                for r1 in range(seed_square):
+                    seed[0, 0, int(np.round(x1+(x2-x1)/2))+r0, int(np.round(y1+(y2-y1)/2))+r1, int(best_z) + i] = int(unique_cell_id)
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map
@@ -360,10 +379,11 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # Context aware probability map
             # If true, watershed is done on the probability map, distance is now probability
-            if USE_PROB_MAP:
+            if USE_PROB_MAP and mask_slice.max() > 1:
                 # Experimetnal
-                # mask_slice -= np.min(mask_slice)
-                # mask_slice /= np.max(mask_slice)
+                mask_slice += 1e-8
+                mask_slice -= np.min(mask_slice)
+                mask_slice /= np.max(mask_slice)
 
                 mask_slice_binary = mask_slice > mask_prob_threshold
                 distance[0, 0, :, :, :] = mask_slice[0, 0, :, :, :]
@@ -391,22 +411,25 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # # EXPERIMENTAL
             # # maybe by adjusting the probability map to include steep cuttoffs in gradient, we can improve watershed
-            # distance_expanded[distance_expanded < .2] = 0
+            distance_expanded[distance_expanded < .2] = 0
 
-            # EXPERIMENTAL
-            for i in range(15):
+            # # EXPERIMENTAL
+            for i in range(hcat.__expand_mask__):
                 mask_expanded = skimage.morphology.binary_dilation(mask_expanded)
 
             seed_slice_expanded[distance_expanded < 0.15] = 1
 
+            # distance_expanded[distance_expanded > .85] = 1
             # distance_expanded[distance_expanded < 0.1]=0
+
             # Run the watershed algorithm
             # Seems to help when you square the distance function... creates steeper gradients????
             # compactness  > 0.8 is too much
             # Best is .03
             labels_expanded = skimage.segmentation.watershed((distance_expanded) * -1, seed_slice_expanded,
                                                     mask=mask_expanded,
-                                                    watershed_line=True, compactness=0.05)
+                                                    connectivity=hcat.__conectivity__,
+                                                    watershed_line=True, compactness=hcat.__compactness__)
 
             #Hminima
             # A/B test between matlab watershed and skimage

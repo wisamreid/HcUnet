@@ -12,6 +12,7 @@ import glob
 import skimage.filters
 import skimage.morphology
 import matplotlib.colors
+import skimage.exposure
 import tifffile
 
 def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chunk_storage=None):
@@ -53,7 +54,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
     unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
-    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_1.unet')
+    # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_2.unet')
     # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
     unet.eval()
@@ -89,30 +90,93 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             for tr in transforms:
                 image_slice = tr(image_slice)
 
+
+            fig, ax = plt.subplots(figsize=(3, 3))
+            a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).max(dim=-1)[0].reshape(-1).numpy()
+            ax.hist(a, color='#006400', bins=np.linspace(0,1,30))
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.axvline(a.mean(), color='red', lw = 1)
+            ax.legend(['Mean GFP Value'])
+            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            plt.xlabel('GFP Pixel Intensity')
+            plt.yticks([])
+            ax.text(0.25, 1e5, f'Mean: {str(image_slice[0,2,:,:,:].float().mul_(0.5).add_(0.5).numpy().max(-1).mean())[0:6:1]}')
+            plt.tight_layout()
+            plt.savefig(f'max_pix_hist{i}_{j}.svg')
+            plt.show()
+
+            fig, ax = plt.subplots(figsize=(3, 3))
+            a = image_slice[0,2,:,:,:].reshape(-1).numpy() * 0.5 + 0.5
+            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            plt.yticks([])
+            ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.axvline(a.mean(), color='red', lw = 1)
+            ax.legend(['Mean GFP Value'])
+            plt.xlabel('GFP Pixel Intensity')
+            ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
+            plt.tight_layout(pad=1.25)
+            plt.savefig(f'all_pix_hist{i}_{j}.svg')
+            plt.show()
+
+            fig, ax = plt.subplots(figsize=(3, 3))
+            a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).mean(dim=-1).reshape(-1).numpy()
+            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            plt.yticks([])
+            ax.axvline(a.mean(), color='red', lw = 1)
+            ax.legend(['Mean GFP Value'])
+            plt.xlabel('GFP Pixel Intensity')
+            # ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
+            plt.tight_layout(pad=1.25)
+            plt.savefig(f'mean_pix_hist{i}_{j}.svg')
+            plt.show()
+
+
+
             # Convert to a 3 channel image for faster rcnn.
             image_slice_frcnn = image_slice[:, [0, 2, 3], :, :, :]
 
             # We want this to generate a list of all the cells in the chunk.
             # These cells will have centers that can be filled in with watershed later.
-            print(f'\tGenerating list of cell candidates for chunk [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]: ', end='', flush=True)
+            print(f'\tGenerating list of cell candidates for chunk [{i}, {j}] [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]: ', end='', flush=True)
+            if os.path.exists(f'pccl{i}_{j}.pkl'):
+                predicted_cell_candidate_list = torch.load(open(f'pccl{i}_{j}.pkl','rb'))
+            else:
+                predicted_cell_candidate_list = hcat.predict_cell_candidates(image_slice_frcnn.float().to(device),
+                                                                             model=faster_rcnn,
+                                                                             initial_coords=(x_ind[j - 1], y_ind[i - 1]))
+            if not os.path.exists(f'pccl{i}_{j}.pkl'):
+                torch.save(predicted_cell_candidate_list, open(f'pccl{i}_{j}.pkl','wb'))
 
-            predicted_cell_candidate_list = hcat.predict_cell_candidates(image_slice_frcnn.float().to(device),
-                                                                         model=faster_rcnn,
-                                                                         initial_coords=(x_ind[j - 1], y_ind[i - 1]))
-
-            print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]', flush=True)
+            print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]'
+                  f'[Max Probability: {predicted_cell_candidate_list["scores"].max()}]', flush=True)
 
             # We now want to predict the semantic segmentation mask for the chunk.
             print(f'\tPredicting segmentation mask for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
+            if os.path.exists(f'psm{i}_{j}.pkl'):
+                predicted_semantic_mask = torch.load(open(f'psm{i}_{j}.pkl', 'rb'))
+            else:
+                predicted_semantic_mask = hcat.predict_segmentation_mask(unet, image_slice, device, use_probability_map=True)
 
-            predicted_semantic_mask = hcat.predict_segmentation_mask(unet, image_slice, device, use_probability_map=True)
+            if not os.path.exists(f'psm{i}_{j}.pkl'):
+                torch.save(predicted_semantic_mask, open(f'psm{i}_{j}.pkl','wb'))
 
             print(f'Done ', flush=True)
 
+
             # Experimental
-            predicted_semantic_mask = torch.tensor(skimage.filters.gaussian(predicted_semantic_mask.numpy()))
-            predicted_semantic_mask[predicted_semantic_mask < 0.15] = 0
+            predicted_semantic_mask = torch.tensor(skimage.filters.gaussian(predicted_semantic_mask.numpy(), sigma=3))
+            predicted_semantic_mask[predicted_semantic_mask < 0.25] = 0
             predicted_semantic_mask = predicted_semantic_mask * 10
+
 
             # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
             print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
@@ -120,25 +184,37 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                         predicted_cell_candidate_list,
                                                                                         image_slice,
-                                                                                        cell_prob_threshold=0.3,
-                                                                                        mask_prob_threshold=0.15)
+                                                                                        cell_prob_threshold=hcat.__cell_prob_threshold__,
+                                                                                        mask_prob_threshold=hcat.__mask_prob_threshold__)
             print('Done', flush=True)
 
             print(f'\tRemoving outlines and saving new chunk image...',end='')
+            seed = seed > 0
+            # for _ in range(1):
+            #     seed = skimage.morphology.binary_dilation(seed)
+            io.imsave(f'seed{i}_{j}.tif', seed[0,0,:,:,:].astype(np.uint8).transpose((2,0,1)) * 255)
+
             ind = utils.mask_to_lines(unique_mask)
             test = np.copy(unique_mask)
             test[ind] = 0
             # TZCYXS order
             uni = np.unique(test)
             uni = uni[uni!=0]
+            image_constrast = np.copy(image_slice.numpy())
+            image_constrast *= 0.5
+            image_constrast += .5
+            for c in range(image_slice.shape[1]):
+                image_constrast[0,c,:,:,:] = skimage.exposure.adjust_gamma(image_constrast[0,c,:,:,:], 1, gain=2.5)
+                # image_constrast[0,c,:,:,:] =skimage.exposure.equalize_hist(image_slice[0,c,:,:,:].numpy())
+
             for u in uni:
                 color = utils.color_from_ind(u)
-                for c in range(image_slice.shape[1]):
-                    image_slice[0,c,:,:,:][test[0,0,:,:,:]==u] = color[c]
+                for c in range(image_constrast.shape[1]):
+                    image_constrast[0,c,:,:,:][test[0,0,:,:,:]==u] = color[c]
+                    image_constrast[0,c,:,:,:][seed[0,0,:,:,:] > 0] = 1
             # tifffile.imwrite('path/to/temp.ome.tiff', data_0, imagej=True)
-            tifffile.imsave('test_outline.tif', image_slice[0,[3,2,0],:,:,:].numpy().transpose((3,0,2,1)))
+            tifffile.imsave(f'test_outline{i}_{j}.tif', image_constrast[0,[3,2,0],:,:,:].transpose((3,0,2,1)))
             print('Done')
-
 
 
             print(f'\tAssigning cell objects:', end=' ', flush=True)
@@ -211,7 +287,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         mask.gt_(.5)
         mask = mask.numpy()
 
-    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask[0,0,:,:,:].sum(-1) > 8, equal_spaced_distance=2)
+    cochlear_length, percent_base_to_apex, apex = utils.get_cochlear_length(mask[0,0,:,:,:].sum(-1), equal_spaced_distance=2)
     print('Done', flush=True)
 
     print(f'Assigning freq to cell...', end=' ', flush=True)
@@ -220,14 +296,14 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
     print('Done', flush=True)
 
     if show_plots or save_plots:
-        plt.figure(figsize=(30,30))
+        plt.figure(figsize=(10,10))
         plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
-        plt.plot(cochlear_length[0,:], cochlear_length[1,:])
+        plt.plot(cochlear_length[0,:], cochlear_length[1,:], lw = 5)
         for cell in all_cells:
-            plt.plot(cell.center[1], cell.center[0], 'b.')
             x = [cell.center[1], cell.frequency[0][0]]
             y = [cell.center[0], cell.frequency[0][1]]
             plt.plot(x, y, 'r-')
+            plt.plot(cell.center[1], cell.center[0], 'b.')
         if save_plots:
             plt.savefig('allcellsonmask.tif',dpi=400)
         if show_plots:

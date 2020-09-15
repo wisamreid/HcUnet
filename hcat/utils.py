@@ -145,7 +145,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
 
     image = skimage.morphology.skeletonize(image)
 
-
     # first reshape to a logical image format and do a max project
     if image.ndim > 2:
         image = image.transpose((1,2,3,0)).mean(axis=3)/2**16
@@ -153,9 +152,17 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
         image = skimage.filters.gaussian(image, sigma=2) > .5
         image = skimage.morphology.binary_erosion(image)
 
-    center_of_mass = np.array(scipy.ndimage.center_of_mass(image)) - 15
+    # Sometimes there are NaN or inf we have to take care of
+    image[np.isnan(image)] = 0
+    try:
+        center_of_mass = np.array(scipy.ndimage.center_of_mass(image))
+        while image[int(center_of_mass[0]), int(center_of_mass[1])] > 0:
+            center_of_mass += 1
+    except ValueError:
+        center_of_mass = [image.shape[0], image.shape[1]]
 
     # Turn the binary image into a list of points for each pixel that isnt black
+
     x, y = image.nonzero()
     x += -int(center_of_mass[0])
     y += -int(center_of_mass[1])
@@ -169,18 +176,23 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     theta = theta[ind]
     r = r[ind]
 
-
     # there will be a break somewhere because the cochlea isnt a full circle
     # Find the break and subtract 2pi to make the fun continuous
     loc = np.abs(theta[0:-2:1] - theta[1:-1:1])
+
     theta[loc.argmax()::] += -2*np.pi
     ind = theta.argsort()[1:-1:1]
     theta = theta[ind]
     r = r[ind]
 
+    # seems to work better if we downsample by interpolation
+    theta_i = np.linspace(theta.min(), theta.max(), 100)
+    r_i = np.interp(theta_i, theta, r)
+    theta = theta_i
+    r = r_i
 
     # run a spline in spherical space after sorting to get a best approximated fit
-    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=0.004, k=3)
+    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=1e-6, k=3)
     u_new = np.arange(0,1,1e-4)
 
     # get new values of theta and r for the fitted line
