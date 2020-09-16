@@ -14,6 +14,7 @@ import skimage.morphology
 import matplotlib.colors
 import skimage.exposure
 import tifffile
+import plotarchive
 
 def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chunk_storage=None):
 
@@ -90,56 +91,56 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             for tr in transforms:
                 image_slice = tr(image_slice)
 
-
-            fig, ax = plt.subplots(figsize=(3, 3))
-            a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).max(dim=-1)[0].reshape(-1).numpy()
-            ax.hist(a, color='#006400', bins=np.linspace(0,1,30))
-            ax.spines['right'].set_visible(False)
-            ax.spines['top'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.axvline(a.mean(), color='red', lw = 1)
-            ax.legend(['Mean GFP Value'])
-            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
-            plt.xlabel('GFP Pixel Intensity')
-            plt.yticks([])
-            ax.text(0.25, 1e5, f'Mean: {str(image_slice[0,2,:,:,:].float().mul_(0.5).add_(0.5).numpy().max(-1).mean())[0:6:1]}')
-            plt.tight_layout()
-            plt.savefig(f'max_pix_hist{i}_{j}.svg')
-            plt.show()
-
-            fig, ax = plt.subplots(figsize=(3, 3))
-            a = image_slice[0,2,:,:,:].reshape(-1).numpy() * 0.5 + 0.5
-            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
-            plt.yticks([])
-            ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
-            ax.spines['right'].set_visible(False)
-            ax.spines['top'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.axvline(a.mean(), color='red', lw = 1)
-            ax.legend(['Mean GFP Value'])
-            plt.xlabel('GFP Pixel Intensity')
-            ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
-            plt.tight_layout(pad=1.25)
-            plt.savefig(f'all_pix_hist{i}_{j}.svg')
-            plt.show()
-
-            fig, ax = plt.subplots(figsize=(3, 3))
-            a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).mean(dim=-1).reshape(-1).numpy()
-            plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
-            ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
-            ax.spines['right'].set_visible(False)
-            ax.spines['top'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            plt.yticks([])
-            ax.axvline(a.mean(), color='red', lw = 1)
-            ax.legend(['Mean GFP Value'])
-            plt.xlabel('GFP Pixel Intensity')
-            # ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
-            plt.tight_layout(pad=1.25)
-            plt.savefig(f'mean_pix_hist{i}_{j}.svg')
-            plt.show()
-
-
+            # @plotarchive.archive(filename=f'gfp_histograms{i}_{j}.pa')
+            # def plot(image_slice):
+            #     fig, ax = plt.subplots(figsize=(3, 3))
+            #     a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).max(dim=-1)[0].reshape(-1).numpy()
+            #     ax.hist(a, color='#006400', bins=np.linspace(0,1,30))
+            #     ax.spines['right'].set_visible(False)
+            #     ax.spines['top'].set_visible(False)
+            #     ax.spines['left'].set_visible(False)
+            #     ax.axvline(a.mean(), color='red', lw = 1)
+            #     ax.legend(['Mean GFP Value'])
+            #     plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            #     plt.xlabel('GFP Pixel Intensity')
+            #     plt.yticks([])
+            #     ax.text(0.25, 1e5, f'Mean: {str(image_slice[0,2,:,:,:].float().mul_(0.5).add_(0.5).numpy().max(-1).mean())[0:6:1]}')
+            #     plt.tight_layout()
+            #     plt.savefig(f'max_pix_hist{i}_{j}.svg')
+            #     plt.show()
+            #
+            #     fig, ax = plt.subplots(figsize=(3, 3))
+            #     a = image_slice[0,2,:,:,:].reshape(-1).numpy() * 0.5 + 0.5
+            #     plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            #     plt.yticks([])
+            #     ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
+            #     ax.spines['right'].set_visible(False)
+            #     ax.spines['top'].set_visible(False)
+            #     ax.spines['left'].set_visible(False)
+            #     ax.axvline(a.mean(), color='red', lw = 1)
+            #     ax.legend(['Mean GFP Value'])
+            #     plt.xlabel('GFP Pixel Intensity')
+            #     ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
+            #     plt.tight_layout(pad=1.25)
+            #     plt.savefig(f'all_pix_hist{i}_{j}.svg')
+            #     plt.show()
+            #
+            #     fig, ax = plt.subplots(figsize=(3, 3))
+            #     a =image_slice[0,2,:,:,:].float().mul(0.5).add(0.5).mean(dim=-1).reshape(-1).numpy()
+            #     plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5,3])
+            #     ax.hist(a, color='#006400',bins=np.linspace(0,1,30))
+            #     ax.spines['right'].set_visible(False)
+            #     ax.spines['top'].set_visible(False)
+            #     ax.spines['left'].set_visible(False)
+            #     plt.yticks([])
+            #     ax.axvline(a.mean(), color='red', lw = 1)
+            #     ax.legend(['Mean GFP Value'])
+            #     plt.xlabel('GFP Pixel Intensity')
+            #     # ax.text(0.2, 1e7, f'Mean: {str(a.mean())[0:6:1]}')
+            #     plt.tight_layout(pad=1.25)
+            #     plt.savefig(f'mean_pix_hist{i}_{j}.svg')
+            #     plt.show()
+            # plot(image_slice)
 
             # Convert to a 3 channel image for faster rcnn.
             image_slice_frcnn = image_slice[:, [0, 2, 3], :, :, :]
@@ -187,34 +188,35 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                                                                                         cell_prob_threshold=hcat.__cell_prob_threshold__,
                                                                                         mask_prob_threshold=hcat.__mask_prob_threshold__)
             print('Done', flush=True)
+            torch.save(unique_mask, open(f'unique_mask{i}_{j}.pkl','wb'))
 
-            print(f'\tRemoving outlines and saving new chunk image...',end='')
-            seed = seed > 0
-            # for _ in range(1):
-            #     seed = skimage.morphology.binary_dilation(seed)
-            io.imsave(f'seed{i}_{j}.tif', seed[0,0,:,:,:].astype(np.uint8).transpose((2,0,1)) * 255)
-
-            ind = utils.mask_to_lines(unique_mask)
-            test = np.copy(unique_mask)
-            test[ind] = 0
-            # TZCYXS order
-            uni = np.unique(test)
-            uni = uni[uni!=0]
-            image_constrast = np.copy(image_slice.numpy())
-            image_constrast *= 0.5
-            image_constrast += .5
-            for c in range(image_slice.shape[1]):
-                image_constrast[0,c,:,:,:] = skimage.exposure.adjust_gamma(image_constrast[0,c,:,:,:], 1, gain=2.5)
-                # image_constrast[0,c,:,:,:] =skimage.exposure.equalize_hist(image_slice[0,c,:,:,:].numpy())
-
-            for u in uni:
-                color = utils.color_from_ind(u)
-                for c in range(image_constrast.shape[1]):
-                    image_constrast[0,c,:,:,:][test[0,0,:,:,:]==u] = color[c]
-                    image_constrast[0,c,:,:,:][seed[0,0,:,:,:] > 0] = 1
-            # tifffile.imwrite('path/to/temp.ome.tiff', data_0, imagej=True)
-            tifffile.imsave(f'test_outline{i}_{j}.tif', image_constrast[0,[3,2,0],:,:,:].transpose((3,0,2,1)))
-            print('Done')
+            # print(f'\tRemoving outlines and saving new chunk image...',end='')
+            # seed = seed > 0
+            # # for _ in range(1):
+            # #     seed = skimage.morphology.binary_dilation(seed)
+            # io.imsave(f'seed{i}_{j}.tif', seed[0,0,:,:,:].astype(np.uint8).transpose((2,0,1)) * 255)
+            #
+            # ind = utils.mask_to_lines(unique_mask)
+            # test = np.copy(unique_mask)
+            # test[ind] = 0
+            # # TZCYXS order
+            # uni = np.unique(test)
+            # uni = uni[uni!=0]
+            # image_constrast = np.copy(image_slice.numpy())
+            # image_constrast *= 0.5
+            # image_constrast += .5
+            # for c in range(image_slice.shape[1]):
+            #     image_constrast[0,c,:,:,:] = skimage.exposure.adjust_gamma(image_constrast[0,c,:,:,:], 1, gain=2.5)
+            #     # image_constrast[0,c,:,:,:] =skimage.exposure.equalize_hist(image_slice[0,c,:,:,:].numpy())
+            #
+            # for u in uni:
+            #     color = utils.color_from_ind(u)
+            #     for c in range(image_constrast.shape[1]):
+            #         image_constrast[0,c,:,:,:][test[0,0,:,:,:]==u] = color[c]
+            #         image_constrast[0,c,:,:,:][seed[0,0,:,:,:] > 0] = 1
+            # # tifffile.imwrite('path/to/temp.ome.tiff', data_0, imagej=True)
+            # tifffile.imsave(f'test_outline{i}_{j}.tif', image_constrast[0,[3,2,0],:,:,:].transpose((3,0,2,1)))
+            # print('Done')
 
 
             print(f'\tAssigning cell objects:', end=' ', flush=True)
@@ -276,10 +278,9 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         io.imsave('test_unqiue_mask.tif', unique_mask[0, 0, :, :, :].transpose((2, 1, 0)))
         print('Done!', flush=True)
 
-    if save_plots:
-        print('Saving Cells...',end='', flush=True)
-        pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
-        print('Done!', flush=True)
+    print('Saving Cells...',end='', flush=True)
+    pickle.dump(all_cells, open('all_cells.pkl', 'wb'))
+    print('Done!', flush=True)
 
     print(f'Caluclating spline fit of cochlea...',end=' ', flush=True)
     if mask.dtype == np.float:
@@ -295,7 +296,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         cell.set_frequency(cochlear_length, percent_base_to_apex)
     print('Done', flush=True)
 
-    if show_plots or save_plots:
+    if show_plots or save_plots or True:
         plt.figure(figsize=(10,10))
         plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
         plt.plot(cochlear_length[0,:], cochlear_length[1,:], lw = 5)
@@ -338,14 +339,24 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         dapi = np.array(dapi).flatten()
         actin = np.array(actin).flatten()
 
-        plt.figure()
-        plt.hist(gfp, bins=50)
-        plt.axvline(gfp.mean(), c='red', linestyle='-')
-        plt.xlabel('GFP Intensity')
-        plt.ylabel('Occurrence (cells)')
-        plt.title(path, fontdict={'fontsize': 8})
+        """
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        """
+        fig, ax = plt.subplots(figsize=(3, 3))
+        ax.hist(gfp, color='#006400', bins=np.linspace(0, 1, 30))
+        ax.axvline(gfp.mean(), c='red', linestyle='-')
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.legend(['Mean GFP Value'])
+        plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
+        plt.xlabel('GFP Mean Cell Intensity')
+        plt.yticks([])
+        plt.tight_layout()
         if save_plots:
-            plt.savefig('hist0_gfp.png')
+            plt.savefig('cell_gfp_hist.svg')
         if show_plots:
             plt.show()
         plt.close()
@@ -355,13 +366,21 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         plt.hist(myo, color='yellow', bins=50, alpha=0.6)
         plt.hist(dapi, color='blue', bins=50, alpha=0.6)
         plt.hist(actin, color='red', bins=50, alpha=0.6)
+        plt.legend(['GFP', 'DAPI', 'Actin', 'Myo7a'])
         plt.axvline(gfp.mean(), c='green', linestyle='-')
         plt.axvline(myo.mean(), c='yellow', linestyle='-')
         plt.axvline(dapi.mean(), c='blue', linestyle='-')
         plt.axvline(actin.mean(), c='red', linestyle='-')
-        plt.xlabel('Signal Intensity')
-        plt.ylabel('Occurrence (cells)')
+        ax = plt.gca()
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.legend(['Mean GFP Value'])
+        plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
+        plt.yticks([])
+        plt.xlabel('Fluorescence Intensity')
         plt.title(path, fontdict={'fontsize': 8})
+        plt.tight_layout()
         if save_plots:
             plt.savefig('hist0_all_colors.png')
         if show_plots:

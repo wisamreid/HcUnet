@@ -6,13 +6,18 @@ class HairCell:
     def __init__(self, image_coords, center, image, mask, id, type=None):
         self.image_coords = image_coords # [x1, y1, z1, x2, y2, z2]
         self.center = center  # [x,y,z]
-        # self.mask = mask # numpy array
+        # self.mask = mask # numpy array | mask [x,y,z]
         # self.frequency = []
         self.type = type
         self.distance_from_apex = []
         self.unique_id = id
         self.is_bad = False
         self.signal_stats = {}
+        self.volume = 0
+
+        for z in range(mask.shape[-1]):
+            #Assume 488 volume
+            self.volume += 608e-9 * (mask[:,:,z] > 0).sum() * ((163e-9)**2)
 
         if isinstance(image, torch.Tensor):
             image = image.numpy()

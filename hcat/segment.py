@@ -281,8 +281,27 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
     z = predicted_cell_candidate_list['z_level'].cpu().numpy()
     prob = predicted_cell_candidate_list['scores'].cpu().numpy()
+    boxes = predicted_cell_candidate_list['boxes'][prob > cell_prob_threshold]
     z = z[prob > cell_prob_threshold]
     prob = prob[prob > cell_prob_threshold]
+
+    # Try to basically remove boxes that arent likely to be over a cell.
+    x1,y1,x2,y2 = boxes.T
+    centers = [np.round(x1+(x2-x1)/2).tolist(), np.round(y1+(y2-y1)/2).tolist(), predicted_cell_candidate_list['z_level'].tolist()]
+    centers = np.array(centers)
+    ind = np.zeros(len(x1))
+    iter = 0
+    for x0, y0, z0 in centers.T:
+        print(x0,y0,z0)
+        try:
+            if predicted_semantic_mask[0,0,int(x0), int(y0), int(z0)] > 0.5:
+                ind[iter] = 1
+                iter += 1
+        except IndexError:
+            iter += 1
+
+    z = z[ind > 0]
+    prob = prob[ind > 0]
 
     unique_z, counts = np.unique(z, return_counts=True)
     best_z = 0
