@@ -206,7 +206,8 @@ class random_rotate:
         else:
             theta = self.angle
 
-        return ndimage.rotate(image.astype(np.float), angle=theta, reshape='false', order=0, mode='wrap', prefilter=False)
+        # We need the shape to be something like [X Y Z C]
+        return ndimage.rotate(image.astype(np.float), axes=(0,1), angle=theta, reshape='false', order=0, mode='constant', prefilter=False)
 
 
 class normalize:
@@ -248,7 +249,7 @@ class drop_channel:
 
 
 class random_intensity:
-        def __init__(self, range=(.5,1.2), chance=.75):
+        def __init__(self, range=(.5,1.5), chance=0):
             self.range = range
             self.chance = chance
 
@@ -267,7 +268,8 @@ class random_intensity:
             if image.ndim == 4:
                 for c in range(image.shape[-1]):
                     if np.random.random() > self.chance:
-                        val = np.random.randint(0, 50, 1)/100
+                        val = np.random.randint(-50, 50, 1)/100
+                        val = 0.25
                         image[:, :, :, c] -= val
                         image[image < 0] = 0
                         image[np.isnan(image)] = 0

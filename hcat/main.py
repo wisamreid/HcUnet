@@ -54,7 +54,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                      groups=2).to(device)
 
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
-    unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    unet.load('/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_2.unet')
     # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
@@ -62,7 +62,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
     print('Done', flush=True)
 
     print('Initalizing FasterRCNN:  ', end='', flush=True)
-    faster_rcnn = hcat.rcnn(path='/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug20_13:49.pth')
+    faster_rcnn = hcat.rcnn(path='/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug20_13:49.pth')
     faster_rcnn.to(device)
     faster_rcnn.eval()
     print('Done', flush=True)
@@ -254,6 +254,8 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                           predicted_semantic_mask.numpy()[0, 0, :, :, :].transpose((2, 1, 0)))
 
             a = hcat.mask.Part(predicted_semantic_mask.numpy(), unique_mask, (x_ind[j - 1], y_ind[i - 1]))
+            print(f'Mask Shape: {predicted_semantic_mask.shape}')
+            print(f'Unique Mask Shape: {unique_mask.shape}')
             pickle.dump(a, open(
                 path_chunk_storage + '/' + time.strftime("%y-%m-%d_%H-%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
             a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
@@ -296,97 +298,100 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
         cell.set_frequency(cochlear_length, percent_base_to_apex)
     print('Done', flush=True)
 
-    if show_plots or save_plots or True:
-        plt.figure(figsize=(10,10))
-        plt.imshow(mask[0,0,:,:,:].sum(-1)/mask[0,0,:,:,:].sum(-1).max(),cmap='Greys_r')
-        plt.plot(cochlear_length[0,:], cochlear_length[1,:], lw = 5)
-        for cell in all_cells:
-            x = [cell.center[1], cell.frequency[0][0]]
-            y = [cell.center[0], cell.frequency[0][1]]
-            plt.plot(x, y, 'r-')
-            plt.plot(cell.center[1], cell.center[0], 'b.')
-        if save_plots:
-            plt.savefig('allcellsonmask.tif',dpi=400)
-        if show_plots:
-            plt.show()
-        plt.close()
+    # if show_plots or save_plots or True:
+    #     plt.figure(figsize=(10,10))
+    #     plt.imshow(image[0,[0,2,3],:,:,5].numpy().transpose((1,2,0)) * 0.5 + 0.5)
+    #     # plt.plot(cochlear_length[0,:], cochlear_length[1,:], lw = 5)
+    #     for cell in all_cells:
+    #         x = [cell.center[1], cell.frequency[0][0]]
+    #         y = [cell.center[0], cell.frequency[0][1]]
+    #         # plt.plot(x, y, 'r-')
+    #         plt.plot(cell.center[1], cell.center[0], 'b.')
+    #     if save_plots:
+    #         plt.savefig('allcellsonmask.tif',dpi=400)
+    #     if show_plots:
+    #         plt.show()
+    #     plt.close()
+        # plt.figure()
+        # for cell in all_cells:
+        #     plt.plot(cell.frequency[1], cell.gfp_stats['mean'], 'k.')
+        # plt.xlabel('Cell Location (Percent Base to Apex)')
+        # plt.ylabel('GFP Cell Mean')
+        # ax = plt.gca()
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        # if save_plots:
+        #     plt.savefig('gfp_mean_vs_loc.pdf')
+        # if show_plots:
+        #     plt.show()
+        # plt.close()
 
-        plt.figure()
-        for cell in all_cells:
-            plt.plot(cell.frequency[1], cell.gfp_stats['mean'], 'k.')
-        plt.xlabel('Percentage Base to Apex')
-        plt.ylabel('GFP Cell Mean')
-        if save_plots:
-            plt.savefig('gfp_mean_vs_loc.tif',dpi=400)
-        if show_plots:
-            plt.show()
-        plt.close()
-
-        gfp = []
-        myo = []
-        dapi = []
-        actin = []
-        for cell in all_cells:
-            if not np.isnan(cell.gfp_stats['mean']):
-                gfp.append(cell.gfp_stats['mean'])
-                myo.append(cell.signal_stats['myo7a']['mean'])
-                dapi.append(cell.signal_stats['dapi']['mean'])
-                actin.append(cell.signal_stats['actin']['mean'])
-
-        print('Yeeting', flush=True)
-        gfp = np.array(gfp).flatten()
-        myo = np.array(myo).flatten()
-        dapi = np.array(dapi).flatten()
-        actin = np.array(actin).flatten()
-
-        """
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        """
-        fig, ax = plt.subplots(figsize=(3, 3))
-        ax.hist(gfp, color='#006400', bins=np.linspace(0, 1, 30))
-        ax.axvline(gfp.mean(), c='red', linestyle='-')
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.legend(['Mean GFP Value'])
-        plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
-        plt.xlabel('GFP Mean Cell Intensity')
-        plt.yticks([])
-        plt.tight_layout()
-        if save_plots:
-            plt.savefig('cell_gfp_hist.svg')
-        if show_plots:
-            plt.show()
-        plt.close()
-
-        plt.figure()
-        plt.hist(gfp, color='green', bins=50, alpha=0.6)
-        plt.hist(myo, color='yellow', bins=50, alpha=0.6)
-        plt.hist(dapi, color='blue', bins=50, alpha=0.6)
-        plt.hist(actin, color='red', bins=50, alpha=0.6)
-        plt.legend(['GFP', 'DAPI', 'Actin', 'Myo7a'])
-        plt.axvline(gfp.mean(), c='green', linestyle='-')
-        plt.axvline(myo.mean(), c='yellow', linestyle='-')
-        plt.axvline(dapi.mean(), c='blue', linestyle='-')
-        plt.axvline(actin.mean(), c='red', linestyle='-')
-        ax = plt.gca()
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.legend(['Mean GFP Value'])
-        plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
-        plt.yticks([])
-        plt.xlabel('Fluorescence Intensity')
-        plt.title(path, fontdict={'fontsize': 8})
-        plt.tight_layout()
-        if save_plots:
-            plt.savefig('hist0_all_colors.png')
-        if show_plots:
-            plt.show()
-        plt.close()
-        print('Done', flush=True)
+        # gfp = []
+        # myo = []
+        # dapi = []
+        # actin = []
+        # for cell in all_cells:
+        #     if not np.isnan(cell.gfp_stats['mean']):
+        #         gfp.append(cell.gfp_stats['mean'])
+        #         myo.append(cell.signal_stats['myo7a']['mean'])
+        #         dapi.append(cell.signal_stats['dapi']['mean'])
+        #         actin.append(cell.signal_stats['actin']['mean'])
+        #
+        # print('Yeeting', flush=True)
+        # gfp = np.array(gfp).flatten()
+        # myo = np.array(myo).flatten()
+        # dapi = np.array(dapi).flatten()
+        # actin = np.array(actin).flatten()
+        #
+        # """
+        #
+        # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        #
+        # """
+        # fig, ax = plt.subplots(figsize=(3, 3))
+        # ax.hist(gfp, color='#006400', bins=np.linspace(0, 1, 30))
+        # ax.axvline(gfp.mean(), c='red', linestyle='-')
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        # ax.spines['left'].set_visible(False)
+        # ax.legend(['Mean GFP Value'])
+        # plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
+        # plt.xlabel('GFP Mean Cell Intensity')
+        # plt.yticks([])
+        # plt.tight_layout()
+        # if save_plots:
+        #     plt.savefig('cell_gfp_hist.svg')
+        # if show_plots:
+        #     plt.show()
+        # plt.close()
+        #
+        # bins = np.linspace(0,1,100)
+        # plt.figure()
+        # plt.hist(gfp, color='green', bins=bins, alpha=0.6)
+        # plt.hist(myo, color='yellow', bins=bins, alpha=0.6)
+        # plt.hist(dapi, color='blue', bins=bins, alpha=0.6)
+        # plt.hist(actin, color='red', bins=bins, alpha=0.6)
+        # plt.legend(['GFP', 'DAPI', 'Actin', 'Myo7a'])
+        # plt.axvline(gfp.mean(), c='green', linestyle='-')
+        # plt.axvline(myo.mean(), c='yellow', linestyle='-')
+        # plt.axvline(dapi.mean(), c='blue', linestyle='-')
+        # plt.axvline(actin.mean(), c='red', linestyle='-')
+        # ax = plt.gca()
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        # ax.spines['left'].set_visible(False)
+        # ax.legend(['Mean GFP Value'])
+        # plt.ticklabel_format(axis='y', style='scientific', scilimits=[-5, 3])
+        # plt.yticks([])
+        # plt.xlabel('Fluorescence Intensity')
+        # # plt.title(path, fontdict={'fontsize': 8})
+        # plt.tight_layout()
+        # if save_plots:
+        #     plt.savefig('hist0_all_colors.pdf')
+        # if show_plots:
+        #     plt.show()
+        # plt.close()
+        # print('Done', flush=True)
 
     return mask, unique_mask, cell_list, image
 
@@ -394,12 +399,15 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 if __name__ =='__main__':
 
     base = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
+    # base = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
+    # path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/validate/Mar 6 AAV2-PHP.B-CMV11 m5.lif - m5.tif'
+    path = None
     newfolder = time.strftime('%y%m%d%H%M')
     path_chunk = base+newfolder
     os.mkdir(base + newfolder)
 
     try:
-        analyze(path=None, numchunks=3, save_plots=True, show_plots=True, path_chunk_storage=path_chunk)
+        analyze(path=path, numchunks=3, save_plots=True, show_plots=True, path_chunk_storage=path_chunk)
 
     except:
         files = glob.glob(path_chunk+'/*')

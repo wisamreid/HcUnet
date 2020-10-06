@@ -281,18 +281,17 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
     z = predicted_cell_candidate_list['z_level'].cpu().numpy()
     prob = predicted_cell_candidate_list['scores'].cpu().numpy()
-    boxes = predicted_cell_candidate_list['boxes'][prob > cell_prob_threshold]
+    boxes = predicted_cell_candidate_list['boxes'][prob > cell_prob_threshold, :]
     z = z[prob > cell_prob_threshold]
     prob = prob[prob > cell_prob_threshold]
 
     # Try to basically remove boxes that arent likely to be over a cell.
     x1,y1,x2,y2 = boxes.T
-    centers = [np.round(x1+(x2-x1)/2).tolist(), np.round(y1+(y2-y1)/2).tolist(), predicted_cell_candidate_list['z_level'].tolist()]
+    centers = [np.round(x1+(x2-x1)/2).tolist(), np.round(y1+(y2-y1)/2).tolist(), z.tolist()]
     centers = np.array(centers)
     ind = np.zeros(len(x1))
     iter = 0
     for x0, y0, z0 in centers.T:
-        print(x0,y0,z0)
         try:
             if predicted_semantic_mask[0,0,int(x0), int(y0), int(z0)] > 0.5:
                 ind[iter] = 1
@@ -344,8 +343,10 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # Each box is a little to conservative in its estimation of a hair cell
         # To compensate, we add dx and dy to the corners to increase the size 
-        dx = [-10, 10]
-        dy = [-10, 10]
+        # dx = [-10, 10]
+        # dy = [-10, 10]
+        dx = [5,-5]
+        dy = [5,-5]
 
         if (x1 + dx[0]) < 0:
             dx[0] = x1
@@ -371,19 +372,29 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
         y1 = int(torch.round(y1.clone()))
         y2 = int(torch.round(y2.clone()))
 
+        box = predicted_semantic_mask[0,0, int(x1):int(x2), int(y1):int(y2), int(best_z)]
+
+
+
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
         seed_square = 6
         for i in range(seed_square):
             for r0 in range(seed_square):
                 for r1 in range(seed_square):
-                    seed[0, 0, int(np.round(x1+(x2-x1)/2))+r0, int(np.round(y1+(y2-y1)/2))+r1, int(best_z) + i] = int(unique_cell_id)
+                    try:
+                        # seed[0, 0, int(np.round(x1+(x2-x1)/2))+r0, int(np.round(y1+(y2-y1)/2))+r1, int(best_z) + i] = int(unique_cell_id)
+                        seed[0,0, int(x1):int(x2), int(y1):int(y2), int(best_z)+i][box == box.max()] = int(unique_cell_id)
+                    except IndexError:
+                        raise ValueError
+                        continue # We can ensure at least ONE seed will be placed.
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map
     for x in x_ind:
         for y in y_ind:
-            print(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}', end='', flush=True)
+            out_string = f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter} [seed z: {best_z}]'
+            print(out_string, end='', flush=True)
             
             # Take a slice for evaluation
             mask_slice = predicted_semantic_mask[:, :, x[0]:x[1], y[0]:y[1]:, :]
@@ -482,7 +493,7 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
             # Increment iterations
             iterations += 1
-            print('\b \b' * len(f'{" " * (len(str(max_iter)) - len(str(iterations)) + 1)}{iterations}/{max_iter}'), end='')
+            print('\b \b' * len(out_string), end='')
 
     return unique_mask, seed
 

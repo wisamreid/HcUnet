@@ -21,6 +21,8 @@ from scipy.interpolate import splprep, splev
 import pickle
 import glob
 
+import GPy
+
 import matplotlib.pyplot as plt
 
 
@@ -119,9 +121,6 @@ def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape
 
 
 def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
-
-    #JUST DO IT ON THE MASK YOU BOOB. WONT HAVE TO WORRY ABOUT NONSENSE THRESHOLDING
-
     """
     Input an image ->
     max project ->
@@ -137,6 +136,12 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     """
     image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
     image = skimage.morphology.binary_closing(image)
+
+    plt.figure(figsize=(3,3))
+    plt.imshow(image,cmap='Greys')
+    plt.tight_layout(pad=0.1)
+    plt.savefig('Downsampled_image.pdf')
+    plt.show()
 
     image = skimage.morphology.diameter_closing(image, 10)
 
@@ -161,11 +166,20 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     except ValueError:
         center_of_mass = [image.shape[0], image.shape[1]]
 
+
     # Turn the binary image into a list of points for each pixel that isnt black
 
     x, y = image.nonzero()
     x += -int(center_of_mass[0])
     y += -int(center_of_mass[1])
+
+    plt.figure(figsize=(3,3))
+    plt.plot(x,y, 'k.')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.tight_layout(pad=0.1)
+    plt.savefig('pixel_points.pdf')
+    plt.show()
 
     # Transform into spherical space
     r = np.sqrt(x**2 + y**2)
@@ -176,6 +190,14 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     theta = theta[ind]
     r = r[ind]
 
+    plt.figure(figsize=(3,3))
+    plt.plot(theta, r, 'k.')
+    plt.xlabel('$\Theta$ (Radians)')
+    plt.ylabel('Radius')
+    plt.tight_layout(pad=0.1)
+    plt.savefig('theta_r_transform.pdf')
+    plt.show()
+
     # there will be a break somewhere because the cochlea isnt a full circle
     # Find the break and subtract 2pi to make the fun continuous
     loc = np.abs(theta[0:-2:1] - theta[1:-1:1])
@@ -185,18 +207,66 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     theta = theta[ind]
     r = r[ind]
 
+
     # seems to work better if we downsample by interpolation
-    theta_i = np.linspace(theta.min(), theta.max(), 100)
-    r_i = np.interp(theta_i, theta, r)
-    theta = theta_i
-    r = r_i
+    # theta_i =np.linspace(theta.min(), theta.max(), 100)
+    # r_i= np.interp(theta_i, theta, r)
+    # theta = theta_i
+    # r = r_i
+
+    # r_i = np.linspace(r.min(), r.max(), 200)
+    # theta_i = np.interp(r_i, r, theta)
+    # theta = theta_i
+    # r = r_i
+
+    plt.figure(figsize=(3,3))
+    plt.plot(theta, r, 'k.')
+    plt.xlabel('$\Theta$ (Radians)')
+    plt.ylabel('Radius')
+    plt.tight_layout(pad=0.1)
+    plt.savefig('theta_r_fixed.pdf')
+    plt.show()
+
 
     # run a spline in spherical space after sorting to get a best approximated fit
-    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=1e-6, k=3)
+    tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=1.5e-6, k=3)
     u_new = np.arange(0,1,1e-4)
 
     # get new values of theta and r for the fitted line
     theta_, r_ = splev(u_new, tck)
+
+    # plt.plot(theta, r, 'k.')
+    # plt.xlabel('$\Theta$ (Radians)')
+    # plt.ylabel('Radius')
+    # plt.plot(theta_, r_)
+    # plt.show()
+
+    kernel = GPy.kern.RBF(input_dim=1, variance=100., lengthscale=5.)
+    m = GPy.models.GPRegression(theta[:,np.newaxis], r[:,np.newaxis], kernel)
+    m.optimize()
+    r_, _ = m.predict(theta[:,np.newaxis])
+    r_ = r_[:,0]
+    theta_ = theta
+
+    plt.figure(figsize=(3,3))
+    X = m.kern.K(theta[:,np.newaxis], theta[:,np.newaxis])
+    plt.imshow(X)
+    plt.tight_layout(pad=0.1)
+    plt.xlabel('$\Theta$ (Radians)')
+    plt.ylabel('$\Theta$ (Radians)')
+    plt.savefig('CovMat.pdf')
+    plt.show()
+
+    plt.figure(figsize=(3,3))
+    plt.plot(theta, r, 'k.')
+    plt.xlabel('$\Theta$ (Radians)')
+    plt.ylabel('Radius')
+    plt.tight_layout(pad=0.1)
+    plt.plot(theta_, r_, 'r',)
+    plt.savefig('GP_fit_on_theta_r.pdf')
+    plt.show()
+
+
 
     x_spline = r_*np.cos(theta_) + center_of_mass[1]
     y_spline = r_*np.sin(theta_) + center_of_mass[0]
@@ -215,6 +285,15 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
 
     equal_spaced_points = np.array(equal_spaced_points) * 10  # <-- Scale factor from above
     equal_spaced_points = equal_spaced_points.T
+
+    plt.figure(figsize=(3,3))
+    plt.plot((x+center_of_mass[0])*10,(y+center_of_mass[1])*10, 'k.')
+    plt.plot(equal_spaced_points[1,:], equal_spaced_points[0,:],'r')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.tight_layout(pad=0.1)
+    plt.savefig('GP_fit_on_x_y.pdf')
+    plt.plot()
 
     curve = tck[1][0]
     if curve[0] > curve[-1]:

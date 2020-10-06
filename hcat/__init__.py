@@ -16,18 +16,18 @@ else:
     __CUDA_MEM__ = False
 
 # Watershed Constants
-__conectivity__ = 15
-__compactness__ = 0.001
+__conectivity__ = 1
+__compactness__ = 0.01
 __expand_mask__ = 15
 
 # Seed placement Constants
-__expand_z__ = 1
+__expand_z__ = 3
 __z_tolerance__ = 3
 
 
 # Hcat.generate_unique_segmentation_mask_from_probability
-__mask_prob_threshold__ = 0.2
-__cell_prob_threshold__ = 0.35
+__mask_prob_threshold__ = 0.5
+__cell_prob_threshold__ = 0.5
 
 # unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
 #                                                                             predicted_cell_candidate_list,
