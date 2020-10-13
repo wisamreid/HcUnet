@@ -5,6 +5,8 @@ import numpy as np
 from numba import njit
 from numba import prange
 
+import pandas as pd
+
 import skimage
 import skimage.exposure
 import skimage.filters
@@ -137,12 +139,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     image = skimage.transform.downscale_local_mean(image, (10, 10)) > 0
     image = skimage.morphology.binary_closing(image)
 
-    plt.figure(figsize=(3,3))
-    plt.imshow(image,cmap='Greys')
-    plt.tight_layout(pad=0.1)
-    plt.savefig('Downsampled_image.pdf')
-    plt.show()
-
     image = skimage.morphology.diameter_closing(image, 10)
 
     for i in range(5):
@@ -173,14 +169,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     x += -int(center_of_mass[0])
     y += -int(center_of_mass[1])
 
-    plt.figure(figsize=(3,3))
-    plt.plot(x,y, 'k.')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.tight_layout(pad=0.1)
-    plt.savefig('pixel_points.pdf')
-    plt.show()
-
     # Transform into spherical space
     r = np.sqrt(x**2 + y**2)
     theta = np.arctan2(x, y)
@@ -189,14 +177,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     ind = theta.argsort()
     theta = theta[ind]
     r = r[ind]
-
-    plt.figure(figsize=(3,3))
-    plt.plot(theta, r, 'k.')
-    plt.xlabel('$\Theta$ (Radians)')
-    plt.ylabel('Radius')
-    plt.tight_layout(pad=0.1)
-    plt.savefig('theta_r_transform.pdf')
-    plt.show()
 
     # there will be a break somewhere because the cochlea isnt a full circle
     # Find the break and subtract 2pi to make the fun continuous
@@ -219,15 +199,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     # theta = theta_i
     # r = r_i
 
-    plt.figure(figsize=(3,3))
-    plt.plot(theta, r, 'k.')
-    plt.xlabel('$\Theta$ (Radians)')
-    plt.ylabel('Radius')
-    plt.tight_layout(pad=0.1)
-    plt.savefig('theta_r_fixed.pdf')
-    plt.show()
-
-
     # run a spline in spherical space after sorting to get a best approximated fit
     tck, u = splprep([theta, r], w=np.ones(len(r))/len(r), s=1.5e-6, k=3)
     u_new = np.arange(0,1,1e-4)
@@ -248,26 +219,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
     r_ = r_[:,0]
     theta_ = theta
 
-    plt.figure(figsize=(3,3))
-    X = m.kern.K(theta[:,np.newaxis], theta[:,np.newaxis])
-    plt.imshow(X)
-    plt.tight_layout(pad=0.1)
-    plt.xlabel('$\Theta$ (Radians)')
-    plt.ylabel('$\Theta$ (Radians)')
-    plt.savefig('CovMat.pdf')
-    plt.show()
-
-    plt.figure(figsize=(3,3))
-    plt.plot(theta, r, 'k.')
-    plt.xlabel('$\Theta$ (Radians)')
-    plt.ylabel('Radius')
-    plt.tight_layout(pad=0.1)
-    plt.plot(theta_, r_, 'r',)
-    plt.savefig('GP_fit_on_theta_r.pdf')
-    plt.show()
-
-
-
     x_spline = r_*np.cos(theta_) + center_of_mass[1]
     y_spline = r_*np.sin(theta_) + center_of_mass[0]
 
@@ -285,15 +236,6 @@ def get_cochlear_length(image, equal_spaced_distance, diagnostics=False):
 
     equal_spaced_points = np.array(equal_spaced_points) * 10  # <-- Scale factor from above
     equal_spaced_points = equal_spaced_points.T
-
-    plt.figure(figsize=(3,3))
-    plt.plot((x+center_of_mass[0])*10,(y+center_of_mass[1])*10, 'k.')
-    plt.plot(equal_spaced_points[1,:], equal_spaced_points[0,:],'r')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.tight_layout(pad=0.1)
-    plt.savefig('GP_fit_on_x_y.pdf')
-    plt.plot()
 
     curve = tck[1][0]
     if curve[0] > curve[-1]:
@@ -565,3 +507,54 @@ def color_from_ind(i):
     """
     np.random.seed(i)
     return np.random.random(4)/.5
+
+
+def cells_to_csv(all_cells: list, file_name: str) -> None:
+
+    centers = []
+    percent_location = []
+    unique_id = []
+    mean_gfp = []
+    volume = []
+    df = {}
+
+    for cell in all_cells:
+        centers.append(cell.center)
+        percent_location.append(cell.distance_from_apex)
+        unique_id.append(cell.unique_id)
+        mean_gfp.append(cell.gfp_stats['mean'])
+        volume.append(cell.volume)
+
+    df = {'center':centers,
+          'unique_id': unique_id,
+          'percent_location': percent_location,
+          'mean_gfp': mean_gfp,
+          'volume': volume}
+
+    df = pd.DataFrame(df)
+    df.sort_values(by=['percent_location'])
+    df.to_csv(file_name)
+    return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

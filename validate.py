@@ -29,7 +29,7 @@ def renamed_loads(pickled_bytes):
     file_obj = io.BytesIO(pickled_bytes)
     return renamed_load(file_obj)
 
-path = '/media/chris/Padlock_3/ToAnalyzeGain/'
+path = '/media/DataStorage/ToAnalyze/'
 
 folders = sorted(glob.glob(path+'*_cellBycell/'))
 
@@ -38,8 +38,20 @@ promoter_list = []
 for i, f in enumerate(folders):
     name = os.path.basename(f[0:-1:1])
     promoter = re.search('(Control)|(CMV\d?\d?)', name)[0]
+    laser = re.search('Laser \d.\d\d?',name)
+    if laser is not None:
+        laser = laser[0]
+    else:
+        laser = ''
+
+    gain = re.search('Gain \d\d\d?',name)
+    if gain is not None:
+        gain = gain[0]
+    else:
+        gain = ''
+
     if re.search('Eric', name) is not None:
-        promoter = promoter
+        promoter = 'Full Len'
 
     promoter_list.append(promoter)
 
@@ -49,7 +61,8 @@ promoter_list = np.unique(promoter_list)
 
 # folders=[folders[8],folders[10]]
 traces = []
-
+big_name_list = []
+big_gfp_list = []
 for p in promoter_list:
     keep_mask = False
     image_name = []
@@ -64,28 +77,46 @@ for p in promoter_list:
     for i, f in enumerate(folders):
 
         name = os.path.basename(f[0:-1:1])
+        try:
+            all_cells = renamed_load(open(f+'all_cells.pkl', 'rb'))
+        except FileNotFoundError:
 
-        if re.search('(Control)|(CMV\d?\d?)', name)[0] != p:
             continue
+        if re.search('(Control)|(CMV\d?\d?)', name)[0] == p:
+            continue
+        # if re.search('Eric', name) is None:
+        #     continue
 
         promoter = re.search('(Control)|(CMV\d?\d?)', name)[0]
         animal = re.search('m\d',name)[0]
-        gain = re.search('Gain\d?\d?\d?',name)
 
-        if re.search('Eric', name) is not None:
-            promoter = promoter + ' Full'
+        laser = re.search('Laser \d.\d\d?', name)
+        if laser is not None:
+            laser = laser[0]
+        else:
+            laser = ''
 
+        gain = re.search('Gain \d\d\d?', name)
         if gain is not None:
             gain = gain[0]
         else:
             gain = ''
-        id = promoter + ' ' + animal + ' ' + gain
-        print(f'{id}', end=' | ')
+        print(f'{promoter} {gain} {laser}')
+
+        if re.search('Eric', name) is not None:
+            promoter = promoter + ' Full'
+
+        if gain is None:
+            gain = ''
+        id = promoter + ' ' + animal + ' ' + str(gain) + ' ' + laser
+        # print(f'{id}', end=' | ')
         image_name.append(id)
+        big_name_list.append(id)
 
         print('Loading cells...',end='')
         n = len('Loading cells...')
-        all_cells = renamed_load(open(f+'all_cells.pkl', 'rb'))
+
+
         print('\b \b'*n,end='')
 
         print('Compiling cell values...',end='')
@@ -108,6 +139,7 @@ for p in promoter_list:
         print('\b \b'*n,end='')
 
         gfp_list.append(gfp)
+        big_gfp_list.append(gfp)
         name_list.append([id for i in range(len(gfp))])
         gfp_dict[id] = gfp
         myo_list.append(myo)
@@ -122,7 +154,6 @@ for p in promoter_list:
     idx = np.zeros(len(data['id'].values), dtype=np.int)
     for i, k in enumerate(keys):
         idx[data['id'].values == k] = i
-    print(idx, idx.shape)
 
     # with pm.Model() as gfp_model:
     #     # Hyperparams
@@ -135,32 +166,32 @@ for p in promoter_list:
     #
     #     obs = pm.Normal('obs', mu=mu[idx], sd=sigma[idx], observed=data['gfp'].values)
 
-    with pm.Model() as gfp_model:
-        # Hyperparams
-        alpha = pm.Normal('alpha', mu=0, sd=2)
-        beta = pm.HalfCauchy('beta', beta=5)
-
-        # Model
-        mu = pm.Normal('mu_animal', mu=alpha, sd=beta, shape=len(image_name))
-        sigma = pm.HalfCauchy('sigma', beta=1, shape=len(image_name))
-
-        obs = pm.Normal('obs', mu=mu[idx], sd=sigma[idx], observed=data['gfp'].values)
-
-    with gfp_model:
-        trace = pm.sample(5000, progressbar=True, target_accept=.99)
-        print(pm.rhat(trace))
-        print(pm.summary(trace))
-        print(pm.bfmi(trace))
-        pm.traceplot(trace)
-        plt.tight_layout()
-        plt.savefig(f'{p}_traceplot.png', dpi=300)
-        plt.show()
-        pm.plot_posterior(trace)
-        plt.tight_layout()
-        plt.savefig(f'{p}_posterior.png', dpi=300)
-        plt.show()
-
-    traces.append(trace['alpha'])
+    # with pm.Model() as gfp_model:
+    #     # Hyperparams
+    #     alpha = pm.Normal('alpha', mu=0, sd=2)
+    #     beta = pm.HalfCauchy('beta', beta=5)
+    #
+    #     # Model
+    #     mu = pm.Normal('mu_animal', mu=alpha, sd=beta, shape=len(image_name))
+    #     sigma = pm.HalfCauchy('sigma', beta=1, shape=len(image_name))
+    #
+    #     obs = pm.Normal('obs', mu=mu[idx], sd=sigma[idx], observed=data['gfp'].values)
+    #
+    # with gfp_model:
+    #     trace = pm.sample(5000, progressbar=True, target_accept=.99)
+    #     print(pm.rhat(trace))
+    #     print(pm.summary(trace))
+    #     print(pm.bfmi(trace))
+    #     pm.traceplot(trace)
+    #     plt.tight_layout()
+    #     plt.savefig(f'{p}_traceplot.png', dpi=300)
+    #     plt.show()
+    #     pm.plot_posterior(trace)
+    #     plt.tight_layout()
+    #     plt.savefig(f'{p}_posterior.png', dpi=300)
+    #     plt.show()
+    #
+    # traces.append(trace['alpha'])
 
         # print(f'Loading Image...', end='')
         # n =len('Loading Image...')
@@ -235,34 +266,50 @@ for p in promoter_list:
         plt.show()
     plot(gfp_list)
 
-    @pa.archive(filename='myo_boxplots.pa')
-    def plot(x):
-        plt.figure()
-        plt.boxplot(x)
-        ax = plt.gca()
-        plt.xticks(np.arange(1, len(x)+1, 1), image_name, rotation=90)
-        plt.ylabel('GFP cell average intensity')
-        plt.title('GFP (cell by cell)')
-        plt.show()
-    plot(myo_list)
+    # @pa.archive(filename='myo_boxplots.pa')
+    # def plot(x):
+    #     plt.figure()
+    #     plt.boxplot(x)
+    #     ax = plt.gca()
+    #     plt.xticks(np.arange(1, len(x)+1, 1), image_name, rotation=90)
+    #     plt.ylabel('GFP cell average intensity')
+    #     plt.title('GFP (cell by cell)')
+    #     plt.show()
+    # plot(myo_list)
 
-    plt.figure()
-    plt.boxplot(dapi_list)
-    ax = plt.gca()
-    plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
-    plt.ylabel('DAPI cell average intensity')
-    plt.title('DAPI (cell by cell)')
-    plt.show()
+    # plt.figure()
+    # plt.boxplot(dapi_list)
+    # ax = plt.gca()
+    # plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
+    # plt.ylabel('DAPI cell average intensity')
+    # plt.title('DAPI (cell by cell)')
+    # plt.show()
+    #
+    # plt.figure()
+    # plt.boxplot(actin_list)
+    # ax = plt.gca()
+    # plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
+    # plt.ylabel('Actin cell average intensity')
+    # plt.title('Actin (cell by cell)')
+    # plt.show()
 
-    plt.figure()
-    plt.boxplot(actin_list)
-    ax = plt.gca()
-    plt.xticks(np.arange(1, len(gfp_list)+1, 1), image_name, rotation=90)
-    plt.ylabel('Actin cell average intensity')
-    plt.title('Actin (cell by cell)')
-    plt.show()
+# tr = lambda x: 10 ** x
+# for i, trace in enumerate(traces):
+#     traces[i] = tr(trace)
+#
+# pm.plot_density(traces, data_labels = promoter_list)
+# plt.title('Estimated mean cell intensity of each CMV')
+# plt.xlabel('Mean pixel intensity log10 (16bit)')
+# plt.show()
 
-pm.densityplot(traces, data_labels = promoter_list)
-plt.title('Estimated mean cell intensity of each CMV')
-plt.xlabel('Mean pixel intensity log10 (16bit)')
+big_gfp_list = [big_gfp_list[-1]] + big_gfp_list[1::]
+big_name_list = [big_name_list[-1]] + big_name_list[1::]
+plt.boxplot(big_gfp_list)
+plt.xticks(np.arange(1, len(big_gfp_list)+1, 1), big_name_list, rotation=90)
+plt.ylabel(['Mean GFP Cell Intensity'])
+ax = plt.gca()
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+plt.tight_layout()
+plt.savefig('All_promoter_gfp.pdf')
 plt.show()

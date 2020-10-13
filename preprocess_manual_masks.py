@@ -4,7 +4,7 @@ import ray
 import glob
 from hcat.train import train_utils
 
-basedir = '/home/chris/Desktop/ColorImages/*.labels.tif'
+basedir = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/validate/*.labels.tif'
 
 ray.init()
 

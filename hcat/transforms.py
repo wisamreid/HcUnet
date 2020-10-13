@@ -8,18 +8,50 @@ import glob
 import skimage.io as io
 import skimage.morphology
 import cv2
+import elasticdeform
+
 
 # DECORATOR
 def joint_transform(func):
     """
-    This wrapper generates a seed value for each transform and passes an image from a list to that function
-    It then passes images from a list to the function one at a time and returns a list of outputs
+    Behavior: Makes a function written to randomly transform an image, and abstracts it to apply identical transforms to
+    lists of images.
+    i.e.
+    [image_1, image_2, image_3] -> joint_transform(fun) = [fun(image_1, seed), fun(image_2, seed), fun(image_3, seed)]
 
-    The wrapper is designed to work on the __call__ method of a class. It expects 'self' to be the first argument
-    followed by image, then seed. It allows you to pass a list of 3D images to a function written to transform a
-    single image.
+    Will generate a random seed which will be used to randomly transform the image. Passing the seed to each function
+    allows the same random function to be applied to every image in the list.
 
-    [image_1, image_2, image_3] -> joint_transform(fun) = [fun(image_i, seed), fun(image_2, seed), fun(image_3, seed)]
+    Each function must be:
+        1) __call__ method of a class with arguments self, image, seed
+                class.__call__(self, image, seed)
+                image: numpy.ndarray which the transform is applies
+                seed: number passed to np.random.seed(seed)
+                        -- ensures the same transform is identically applied to each image
+                        -- Does not have to be used in function, must be an argument!
+                            + Applying this decorator to a function without seed WILL NOT WORK
+                            i.e.
+                                @joint_tranform
+                                fun __call__(self, image) <--- MUST HAVE SEED ARG EVEN IF IT ISN'T USD
+                                    return image
+
+        2) function with arguments image, seed
+                @joint_transform
+                def example(image, seed)
+                    " DO STUFF HERE "
+                    return transformed_image
+                image: numpy.ndarray which the transform is applies
+                seed: number passed to np.random.seed(seed). This must be an argument even if seed is not used.
+
+    Edge Cases:
+    - If the user passes a single image, not in a list, will apply the transform and return the transformed image
+      (not in a list).
+
+    - Requires each image in the list to be the same number of dimensions!
+    - Requires each image to have a method: ndim.
+        -- torch.tensor, numpy.ndarray, etc...
+        -- example: numpy.ndarray([1,2,3]).ndim -> 1
+
 
     :param func: Function with arguments 'image' and 'seed'
     :return: Wrapped function that can now accept lists
@@ -27,25 +59,35 @@ def joint_transform(func):
 
     def wrapper(*args):
         image_list = args[-1]  # In the case of a class function, there may be two args, one is 'self'
+
         # We only want to take the last argument, which should always be the image list
+        # If its not (likely just a single image), put it in a list!
         if not type(image_list) == list:
             image_list = [image_list]
 
+        # Check if all the images are the same size!
         if len(image_list) > 1:
             for i in range(len(image_list) - 1):
                 if not image_list[i].ndim == image_list[i + 1].ndim:
                     raise ValueError('Images in joint transforms do not contain identical dimensions.'
                                      + f'Im {i}.ndim:{image_list[i].ndim} != Im {i + 1}.ndim:{image_list[i + 1].ndim} ')
         out = []
+
+        # Generate a random seed value
         seed = np.random.randint(0, 1e8, 1)
+
+        # Evaluate the transform on each function!
         for im in image_list:
-            if len(args) > 1:
+            if len(args) > 1:  # Is it a class? Assume at least 2 args... class.method(self, arg_1, ...)
                 out.append(func(args[0], image=im, seed=seed))
-            else:
+            else:  # Probably not a class! Dont need to pass 'self'.
                 out.append(func(image=im, seed=seed))
+
+        # If a single image was passed initially, return a single image instead of a list of images
         if len(out) == 1:
             out = out[0]
         return out
+
     return wrapper
 
 
@@ -54,6 +96,7 @@ class to_float:
     Takes a numpy image matrix of type uint8 or uint16 (standard leica confocal image conventions) and
     rescale to a float between 0 and 1.
     """
+
     def __init__(self):
         pass
 
@@ -61,10 +104,10 @@ class to_float:
     def __call__(self, image, seed=None):
         if image.dtype == 'uint16':
             image = image.astype(dtype='float', casting='same_kind', copy=False)
-            image /= 2**16
+            image /= 2 ** 16
         elif image.dtype == 'uint8':
             image = image.astype('float', copy=False, casting='same_kind')
-            image /= 2**8
+            image /= 2 ** 8
         elif image.dtype == 'float':
             pass
         else:
@@ -100,7 +143,7 @@ class reshape:
     @joint_transform
     def __call__(self, image, seed=None):
         """
-        Expects image dimmensions to be [Z,Y,X,C] or [Y,X,C]
+        Expects image dimensions to be [Z,Y,X,C] or [Y,X,C]
             (this is how skimage.io.imread outputs 3D tifs), we add a channel if necessary
 
         Reshapes to [x,y,z,c]
@@ -191,7 +234,7 @@ class random_rotate:
     @joint_transform
     def __call__(self, image, seed):
         """
-        Expects a list of numpy.ndarrays of all the same shape. Randonmly rotates the image along x or y dimmension
+        Expects a list of numpy.ndarrays of all the same shape. Randomly rotates the image along x or y dimension
         and returns list of rotated images
 
         :param image:
@@ -207,11 +250,18 @@ class random_rotate:
             theta = self.angle
 
         # We need the shape to be something like [X Y Z C]
-        return ndimage.rotate(image.astype(np.float), axes=(0,1), angle=theta, reshape='false', order=0, mode='constant', prefilter=False)
+        return ndimage.rotate(image.astype(np.float), axes=(0, 1), angle=theta, reshape=False, order=0,
+                              mode='constant', prefilter=False)
 
 
 class normalize:
-    def __init__(self, mean=[.5, .5, .5, .5], std=[.5, .5, .5, .5]):
+    def __init__(self, mean=None, std=None):
+
+        if mean is None:
+            mean = [0.5, 0.5, 0.5, 0.5]
+        if std is None:
+            std = [0.5, 0.5, 0.5, 0.5]
+
         self.mean = mean
         self.std = std
 
@@ -222,11 +272,11 @@ class normalize:
         if image.ndim == 4:
             for channel in range(shape[-1]):
                 image[:, :, :, channel] += -self.mean[channel]
-                image[:, :, :, channel] /=  self.std[channel]
+                image[:, :, :, channel] /= self.std[channel]
         elif image.ndim == 3:
             for channel in range(shape[-1]):
                 image[:, :, channel] += -self.mean[channel]
-                image[:, :, channel] /=  self.std[channel]
+                image[:, :, channel] /= self.std[channel]
         else:
             raise ValueError(f'Expected a 3 or 4 dimensional image not: {image.ndim} with shape: {image.shape}')
         return image
@@ -249,41 +299,39 @@ class drop_channel:
 
 
 class random_intensity:
-        def __init__(self, range=(.5,1.5), chance=0):
-            self.range = range
-            self.chance = chance
+    def __init__(self, range=(.5, 1.5), chance=0):
+        self.range = range
+        self.chance = chance
 
-        def __call__(self, image):
-            """
-            assume in [x,y,z,c]
-            :param image:
-            :return:
-            """
-            # if np.random.random() > self.chance:
-            #     range_min = np.random.randint(0, self.range[0]*10)/100
-            #     range_max = np.random.randint(80, self.range[1]*100)/100
-            #     image = exposure.rescale_intensity(image, 'image', (range_min, range_max))
-            #     image[image > 1] = 1
-            #     image[image < 0] = 0
-            if image.ndim == 4:
-                for c in range(image.shape[-1]):
-                    if np.random.random() > self.chance:
-                        val = np.random.randint(-50, 50, 1)/100
-                        val = 0.25
-                        image[:, :, :, c] -= val
-                        image[image < 0] = 0
-                        image[np.isnan(image)] = 0
-                        image[np.isinf(image)] = 1
-            elif image.ndim == 3:
-                for c in range(image.shape[-1]):
-                    if np.random.random() > self.chance:
-                        val = np.random.randint(0, 50, 1)/100
-                        image[:, :, c] -= val
-                        image[image < 0] = 0
-                        image[np.isnan(image)] = 0
-                        image[np.isinf(image)] = 1
+    def __call__(self, image):
+        """
+        assume in [x,y,z,c]
+        :param image:
+        :return:
+        """
+        if not isinstance(image, np.ndarray):
+            raise TypeError(f'Expected image to be of type np.ndarray, not {type(image)}')
 
-            return image
+        val = np.random.randint(-50, 50, image.shape[-1]) / 100
+
+        if image.ndim == 4:
+            for c in range(image.shape[-1]):
+                if np.random.random() > self.chance:
+                    image[:, :, :, c] -= val[c]
+
+        elif image.ndim == 3:
+            for c in range(image.shape[-1]):
+                if np.random.random() > self.chance:
+                    image[:, :, c] -= val[c]
+
+        else:
+            raise IndexError(f'Image should have 3 or 4 dimmensions, not {image.ndim} with shape {image.shape}')
+
+        image[image < 0] = 0
+        image[np.isnan(image)] = 0
+        image[np.isinf(image)] = 1
+
+        return image
 
 
 class random_crop:
@@ -304,6 +352,15 @@ class random_crop:
         dim = copy.copy(self.dim)
 
         np.random.seed(seed)
+
+        # Sometimes we pass a small image in. If the Z is smaller than user specified, just take the whole Z
+        # For now only do it with Z. I imagine if an x or y is super small it may be best to just throw out the image
+        if not np.all(image.shape[0:-1:1] >= np.array(dim)):
+            if image.shape[-2] < dim[-1]:
+                dim[-1] = image.shape[-2]
+            else:
+                raise IndexError(f'Output dimensions: {dim} are larger than input image: {image.shape}')
+
         if image.ndim == 4:  # 3D image
             shape = image.shape[0:-1]
             ind = shape < dim
@@ -319,24 +376,80 @@ class random_crop:
                 z = 0
                 dim[2] = shape[2]
 
+            out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, z:z + dim[2] - 1:1, :]
+
         elif image.ndim == 3:  # 2D image
             shape = image.shape
             x = np.random.randint(0, dim[0] - shape[0] + 1, 1)
             y = np.random.randint(0, dim[1] - shape[1] + 1, 1)
-        else:
-            raise ValueError(f'Expected np.ndarray with 3/4 ndims but found {image.ndim}')
 
-        if not np.all(image.shape[0:-1:1] >= np.array(dim)):
-            raise IndexError(f'Output dimmensions: {dim} are larger than input image: {shape}')
-
-        if image.ndim == 4:  # 3D image
-            out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, z:z + dim[2] - 1:1, :]
-
-        if image.ndim == 3:  # 3D image
             out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, :]
+
+        else:
+            raise IndexError(f'Image must have dimensions 3 or 4. Not {image.ndim}')
 
         return out
 
+
+class elastic_deform:
+    def __init__(self, grid_shape=(5, 5, 5), scale=5):
+        self.x_grid = grid_shape[0]
+        self.y_grid = grid_shape[1]
+
+        if len(grid_shape) > 2:
+            self.z_grid = grid_shape[2]
+        else:
+            self.z_grid = None
+
+        self.scale = scale
+
+    @joint_transform
+    def __call__(self, image: np.ndarray, seed) -> np.ndarray:
+        """
+        Expect numpy ndarrays with color in the last channel of the array
+        [x,y,z,c] or , [x,y,c]
+        Performs random elastic deformations to the image
+
+        :param image:
+        :return:
+        """
+        if not isinstance(image, np.ndarray):
+            raise ValueError(f'Expected input to be numpy.ndarray but got {type(image)}')
+
+        dtype = image.dtype
+
+        np.random.seed(seed)
+
+        if image.ndim == 4:
+            # generate a deformation grid
+            if self.z_grid is not None:
+                displacement = np.random.randn(3, self.x_grid, self.y_grid, self.z_grid) * self.scale
+            else:
+                raise ValueError('Misspecified deformation vector shape. Should look like: tuple (X, Y, Z)')
+
+            if image.shape[-1] > 1:
+                image = elasticdeform.deform_grid(image, displacement, axis=(0, 1, 2))
+
+            # Try to detect if its the mask. Then just dont interpalate.
+            elif image.shape[-1] == 1:
+                image = elasticdeform.deform_grid(image, displacement, axis=(0, 1, 2), order=0)
+            else:
+                raise ValueError('Dun Fucked Uterp')
+
+            image[image < 0] = 0
+            image[image > 1] = 1
+            image.astype(dtype)
+
+        elif image.ndim == 3:
+            # generate a deformation grid
+            displacement = np.random.randn(2, self.x_grid, self.y_grid) * self.scale
+            image = elasticdeform.deform_grid(image, displacement, axis=(0, 1))
+
+        else:
+            raise ValueError(f'Expected np.ndarray with 3 or 4 dimmensions, '
+                             f'NOT dim: {image.ndim},  shape: {image.shape}')
+
+        return image
 
 # Cant be a @joint_transform because it needs info from one image to affect transforms of other
 class nul_crop:
@@ -348,7 +461,7 @@ class nul_crop:
     def __call__(self, image_list: list) -> list:
         """
         IMAGE MASK PWL
-        :param image:
+        :param image_list: list of images with identical number of dimensions
         :return:
         """
         if not isinstance(image_list, list):
@@ -373,7 +486,6 @@ class nul_crop:
 
 #  FROM FASTER_RCNN CODE
 
-
 class random_x_flip:
     def __init__(self, rate=.5):
         self.rate = rate
@@ -387,22 +499,22 @@ class random_x_flip:
         :param boxes:
         :return:
         """
-        flip = np.random.uniform(0,1,1) < self.rate
+        flip = np.random.uniform(0, 1, 1) < self.rate
 
         shape = image.shape
         boxes = np.array(boxes)
 
         if flip:
-            image = np.copy(image[::-1,:,:])
-            boxes[:,1] = (boxes[:,1] * -1) + shape[0]
-            boxes[:,3] = (boxes[:,3] * -1) + shape[0]
+            image = np.copy(image[::-1, :, :])
+            boxes[:, 1] = (boxes[:, 1] * -1) + shape[0]
+            boxes[:, 3] = (boxes[:, 3] * -1) + shape[0]
 
-        newboxes = np.copy(boxes)
-        # newboxes[:,0] = np.min(boxes[:,0:3:2],axis=1)
-        newboxes[:,1] = np.min(boxes[:,1:4:2],axis=1)
-        # newboxes[:,2] = np.max(boxes[:,0:3:2],axis=1)
-        newboxes[:,3] = np.max(boxes[:,1:4:2],axis=1)
-        boxes = np.array(newboxes,dtype=np.int64)
+        new_boxes = np.copy(boxes)
+        # new_boxes[:,0] = np.min(boxes[:,0:3:2],axis=1)
+        new_boxes[:, 1] = np.min(boxes[:, 1:4:2], axis=1)
+        # new_boxes[:,2] = np.max(boxes[:,0:3:2],axis=1)
+        new_boxes[:, 3] = np.max(boxes[:, 1:4:2], axis=1)
+        boxes = np.array(new_boxes, dtype=np.int64)
 
         return image, boxes.tolist()
 
@@ -423,19 +535,19 @@ class random_y_flip:
         flip = np.random.uniform(0, 1, 1) > 0.5
 
         shape = image.shape
-        boxes = np.array(boxes,dtype=np.int)
+        boxes = np.array(boxes, dtype=np.int)
 
         if flip:
-            image = np.copy(image[:,::-1,:])
+            image = np.copy(image[:, ::-1, :])
             boxes[:, 0] = (boxes[:, 0] * -1) + shape[1]
             boxes[:, 2] = (boxes[:, 2] * -1) + shape[1]
 
-        newboxes = np.copy(boxes)
-        newboxes[:,0] = np.min(boxes[:,0:3:2],axis=1)
-        # newboxes[:,1] = np.min(boxes[:,1:4:2],axis=1)
-        newboxes[:,2] = np.max(boxes[:,0:3:2],axis=1)
-        # newboxes[:,3] = np.max(boxes[:,1:4:2],axis=1)
-        boxes = np.array(newboxes,dtype=np.int64)
+        new_boxes = np.copy(boxes)
+        new_boxes[:, 0] = np.min(boxes[:, 0:3:2], axis=1)
+        # new_boxes[:,1] = np.min(boxes[:,1:4:2],axis=1)
+        new_boxes[:, 2] = np.max(boxes[:, 0:3:2], axis=1)
+        # new_boxes[:,3] = np.max(boxes[:,1:4:2],axis=1)
+        boxes = np.array(new_boxes, dtype=np.int64)
 
         return image, boxes.tolist()
 
@@ -455,7 +567,7 @@ class random_resize:
         :return:
         """
 
-        scale = np.random.uniform(self.scale[0]*100, self.scale[1]*100, 1) / 100
+        scale = np.random.uniform(self.scale[0] * 100, self.scale[1] * 100, 1) / 100
         shape = image.shape
 
         new_shape = np.round(shape * scale)
@@ -472,12 +584,12 @@ class random_resize:
 
 class remove_channel:
 
-    def __init__(self, remaining_channel_index=[0,2,3]):
+    def __init__(self, remaining_channel_index=(0, 2, 3)):
         self.index_remain = remaining_channel_index
 
     def __call__(self, image):
         """
-        Assumes channels are at last dimmension of tensor!
+        Assumes channels are at last dimension of tensor!
 
         :param image:
         :return:
@@ -487,11 +599,11 @@ class remove_channel:
             return image
 
         if image.ndim == 3:
-            image  = image[:,:,self.index_remain]
+            image = image[:, :, self.index_remain]
         elif image.ndim == 4:
-            image  = image[:,:,:,self.index_remain]
+            image = image[:, :, :, self.index_remain]
         elif image.ndim == 5:
-            image  = image[:,:,:,:,self.index_remain]
+            image = image[:, :, :, :, self.index_remain]
 
         return image
 
@@ -504,14 +616,13 @@ class clean_image:
 
     def __init__(self):
         pass
-    
+
     @joint_transform
     def __call__(self, image, seed):
-        type = image.dtype
         image[np.isnan(image)] = 0
         image[np.isinf(image)] = 1
 
-        return image.astype(dtype=type)
+        return image.astype(dtype=image.dtype)
 
 
 class add_junk_image:
@@ -519,7 +630,7 @@ class add_junk_image:
     Simple transform ensuring no nan values are passed to the model.
     """
 
-    def __init__(self, path, channel_index=[0, 2, 3], junk_image_size=(100, 100), normalize=False):
+    def __init__(self, path, channel_index=(0, 2, 3), junk_image_size=(100, 100), normalize=None):
         """
         Take in a path to images that are p junk. Make sure the images are
         :param path:
@@ -532,7 +643,7 @@ class add_junk_image:
         if self.path[-1] != '/':
             self.path += '/'
 
-        self.files = glob.glob(self.path+'*.tif')
+        self.files = glob.glob(self.path + '*.tif')
 
         if len(self.files) < 1:
             raise FileNotFoundError(f'No valid *.tif files found at {path}')
@@ -540,7 +651,7 @@ class add_junk_image:
         self.junk_image_size = junk_image_size
         self.normalize = normalize
 
-        if normalize:
+        if isinstance(self.normalize, dict):
             self.mean = normalize['mean']
             self.std = normalize['std']
 
@@ -548,7 +659,7 @@ class add_junk_image:
         for file in self.files:
             im = io.imread(file)
             im = to_float()(im)
-            if self.normalize:
+            if isinstance(self.normalize, dict):
                 for i in range(im.shape[-1]):
                     im[:, :, i] -= self.mean[i]
                     im[:, :, i] /= self.std[i]
@@ -575,12 +686,13 @@ class add_junk_image:
         shape = junk_image.shape
 
         try:
-            x = np.random.randint(0, shape[0]-(self.junk_image_size[0]+1))
-            y = np.random.randint(0, shape[1]-(self.junk_image_size[1]+1))
+            x = np.random.randint(0, shape[0] - (self.junk_image_size[0] + 1))
+            y = np.random.randint(0, shape[1] - (self.junk_image_size[1] + 1))
         except ValueError:
-            raise ValueError(f'Junk image file {self.files[file_index]} has a shape ({shape}) smaller than max user defined shape')
+            raise ValueError(
+                f'Junk image file {self.files[file_index]} has a shape ({shape}) smaller than max user defined shape')
 
-        junk_image = junk_image[x:x+self.junk_image_size[0], y:y+self.junk_image_size[1], :]
+        junk_image = junk_image[x:x + self.junk_image_size[0], y:y + self.junk_image_size[1], :]
 
         shape = image.shape
         x = np.random.randint(0, shape[0] - (self.junk_image_size[0] + 1))
@@ -619,7 +731,7 @@ def distance_transform(image):
     :param image: np.ndarray [z, x, y, c]
     :return: distance mat of image with shape [z, x, y, c]
     """
-    #Assume image is in a standard state from io.imread [Z, Y/X, X/Y, C?]
+    # Assume image is in a standard state from io.imread [Z, Y/X, X/Y, C?]
 
     if not isinstance(image, np.ndarray):
         raise ValueError(f'Image must be a numpy ndarray, not {type(image)}...')

@@ -45,19 +45,19 @@ class Stack(Dataset):
         self.mask = []
         self.pwl = []
 
-        print('Warning using distance trasnform on mask....')
-
+        # Look through all valid files and store them into lists.
         for mask_path in self.files:
             file_with_mask = os.path.splitext(mask_path)[0]
             image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
             pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
             self.image.append(io.imread(image_data_path))
 
+            # Not every mask is the same size. some are [X,Y,Z,C] others are just [X,Y,Z]
+            # We only want [X, Y, Z]
             try:
-                # EXPERIMENTAL DISTANCE TRANSFORM
-                self.mask.append(t.distance_transform(io.imread(mask_path))[:, :, :, 0])
+                self.mask.append(io.imread(mask_path)[:, :, :, 0])
             except IndexError:
-                self.mask.append(t.distance_transform(io.imread(mask_path)))
+                self.mask.append(io.imread(mask_path))
 
             self.pwl.append(io.imread(pwl_data_path))
 
@@ -104,7 +104,6 @@ class Section(Dataset):
         :param joint_transforms:
         :param out_transforms:
         """
-
 
         if out_transforms is None:
             out_transforms = [t.to_tensor()]

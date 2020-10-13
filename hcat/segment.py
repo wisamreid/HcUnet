@@ -378,16 +378,21 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
 
         # EXPERIMENTAL - TRY PLACEING EVERY SEED ON THE SAME Z PLANE, SHOULD BE BETTER I THINK
         # Here we place a seed value for watershed at each point of the valid box
+        # Holy fuck this is not elegant
         seed_square = 6
         for i in range(seed_square):
+            if i + best_z > seed.shape[-1]:
+                continue
             for r0 in range(seed_square):
                 for r1 in range(seed_square):
                     try:
                         # seed[0, 0, int(np.round(x1+(x2-x1)/2))+r0, int(np.round(y1+(y2-y1)/2))+r1, int(best_z) + i] = int(unique_cell_id)
                         seed[0,0, int(x1):int(x2), int(y1):int(y2), int(best_z)+i][box == box.max()] = int(unique_cell_id)
                     except IndexError:
-                        raise ValueError
-                        continue # We can ensure at least ONE seed will be placed.
+                        if seed.max() > 0:
+                            continue
+                        else:
+                            raise IndexError(f'No Seed was placed when index')
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map
