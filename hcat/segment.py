@@ -393,6 +393,8 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
                             continue
                         else:
                             raise IndexError(f'No Seed was placed when index')
+                    except ValueError:
+                        continue
         unique_cell_id += 1
     
     # Now we can loop through mini chunks and apply watershed to the mask or probability map

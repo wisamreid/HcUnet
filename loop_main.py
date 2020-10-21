@@ -6,6 +6,7 @@ import torch
 import pickle
 import gc
 import time
+import sys
 # path = '/media/DataStorage/ToAnalyze/'
 # analyzed_path = '/media/DataStorage/ToAnalyze/'
 path = '/media/DataStorage/ToAnalyze/'
@@ -26,12 +27,6 @@ for image_loc in image_files:
 
     os.chdir(foldername + '_cellBycell')
 
-
-    print('\x1b[1;33m' + f'Creating CSV:' + '\x1b[0m' + f'{image_loc}')
-    all_cells = pickle.load(open('all_cells.pkl','rb'))
-    cells_to_csv(all_cells, 'all_cells.csv')
-    print(f'DONE')
-
     if os.path.exists('./analysis.lock'):
         print('\x1b[3;31m' + f'Anaysis was previously computed. Skipping this image...' + '\x1b[0m')
         os.chdir('..')
@@ -43,14 +38,22 @@ for image_loc in image_files:
     except FileExistsError:
         print('\x1b[3;33m' +f'maskfiles dir already exists...'+ '\x1b[0m')
 
-
     try:
         analyze(image_loc, numchunks=6, save_plots=False, path_chunk_storage='./maskfiles/')
-    except RuntimeError:
-        analyze(image_loc, numchunks=6, save_plots=False, path_chunk_storage='./maskfiles/')
-
+    except Exception as error:
+        print('\x1b[3;31m' + f'Error with analysis script!' + '\x1b[0m')
+        out_str = str(error)
+        file = open('error.lock', 'w')
+        file.write(out_str)
+        file.close()
+        continue
 
     end_time = time.asctime()
+
+    print('\x1b[1;33m' + f'Creating CSV:' + '\x1b[0m' + f'{image_loc}', end=' ')
+    all_cells = pickle.load(open('all_cells.pkl','rb'))
+    cells_to_csv(all_cells, 'all_cells.csv')
+    print(f'DONE')
 
     if not os.path.exists('./analysis.lock'):
         out_str = f'Start: {start_time} \nEnd: {end_time}'

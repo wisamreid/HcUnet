@@ -14,7 +14,8 @@ model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
                                                              num_classes=3,
                                                              pretrained_backbone=True,
                                                              box_detections_per_img=500)
-model.load_state_dict(torch.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug18_16:02.pth'))
+
+model.load_state_dict(torch.load('./fasterrcnn_Oct13_13:20.pth'))
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.train()
 model = model.to(device)
@@ -25,9 +26,10 @@ data = dataloader.Section(path='./Data/FasterRCNN_trainData/Top/',
                           simple_class=True,
                           image_transforms=[t.to_float(),
                                             t.random_gamma((.85, 1.15)),
-                                            t.random_intensity(),
-                                            t.spekle(0.00001),
+                                            t.random_intensity(range=(-15, 15)),
+                                            t.spekle(0.001),
                                             t.remove_channel(remaining_channel_index=[0, 2, 3]),
+                                            t.elastic_deform((30, 30), 2.3),
                                             t.normalize(**norm),
                                             ],
                           joint_transforms=[
@@ -42,28 +44,38 @@ data = dataloader.Section(path='./Data/FasterRCNN_trainData/Top/',
                                             # t.random_resize(scale=(.3, 4)),
                                             ]
                           )
-
+val_data = dataloader.Section(path='./Data/FasterRCNN_trainData/Top/',
+                          simple_class=True,
+                          image_transforms=[t.to_float(),
+                                            t.remove_channel(remaining_channel_index=[0, 2, 3]),
+                                            t.normalize(**norm),
+                                            ],
+                          joint_transforms=[
+                                            ]
+                          )
 
 
 # Hyper Parameters
-num_epochs = 200
+num_epochs = 5000
 lr = 1e-5
-gamma = 0.998
+gamma = 0.997
 scale = 3
 
 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
 # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
 
-model, summed_losses = hcat.train.frcnn(model, data, optimizer, scheduler, num_epochs, lr, gamma, device, scale=2)
+model, summed_losses = hcat.train.frcnn(model, data, optimizer, scheduler, num_epochs, lr, gamma, device, scale=scale)
+
 torch.save(model.state_dict(), 'fasterrcnn_' + time.strftime('%b%d_%H:%M') + '.pth')
 print(f'Saved: {"fasterrcnn_" + time.strftime("%b%d_%H:%M") + ".pth"}')
-images, _ = data[19]
+images, _ = val_data[19]
 model.eval()
 with torch.no_grad():
     a = model(images.to(device).float())
 
 u.show_box_pred(images.squeeze().float(), a, .3)
+plt.show()
 
 plt.figure()
 plt.plot(summed_losses)

@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.ndimage.morphology
+import scipy.ndimage
 import skimage.io as io
+import skimage.morphology
 from numba import njit
 
 
@@ -114,10 +116,8 @@ class makeMask:
             for i in range(binary_mask.shape[0]):
                 erroded_mask[i,:,:] = scipy.ndimage.morphology.binary_erosion(binary_mask[i,:,:])
                 erroded_mask = erroded_mask >= 1
-            print(np.median(image))
             ogimage[erroded_mask == 0] = background
             image = np.copy(ogimage)
-            print(np.median(image))
 
         return image
 
@@ -176,6 +176,86 @@ def colormask_to_mask(colormask):
 
     return (colormask[:,:,:,0]*255).astype(np.uint8)
 
+
+class CalculateCenterOfMass:
+    def __init__(self):
+        pass
+    def __call__(self, imagepath):
+        # EVERYTHING IS [Z,Y,X,C]
+        ogimage = io.imread(imagepath)
+        image = np.copy(ogimage)
+        background = np.copy(image[0, 0, 0, :])
+
+        image = self.set_background(image, background)
+
+        unique_colors = np.unique(image.reshape(-1, image.shape[3]), axis=0)
+
+        new_image = np.zeros(image.shape[:-1:], dtype=np.uint32)
+        center_of_mass = np.zeros(new_image.shape)
+
+
+        for id, color in enumerate(unique_colors):
+            ix = np.ones(new_image.shape, dtype=np.bool)
+            for c in range(image.shape[-1]):
+                ix = np.logical_and(ix, image[:, :, :, c] == color[c])
+            new_image[ix] = id
+
+            center = scipy.ndimage.center_of_mass(new_image == id)
+            x = int(np.round(center[2]))
+            y = int(np.round(center[1]))
+            z = int(np.round(center[0]))
+            center_of_mass[z, y, x] = id
+
+        return center_of_mass.astype(np.uint8), new_image
+
+    @staticmethod
+    @njit
+    def set_background( image, background):
+        for z in range(image.shape[0]):
+            for x in range(image.shape[1]):
+                for y in range(image.shape[2]):
+
+                    if np.all(image[z, x, y, :] == background):
+                        image[z, x, y, :] = [0, 0, 0]
+        return image
+
+
+class VectorToCenter():
+    def __init__(self):
+        pass
+
+    def __call__(self, center, colormask, mask):
+        # Stuff is in [z,y,x,c]
+        print(len(np.unique(colormask)), len(np.unique(center)), colormask.max()+1)
+        unique_cells = np.unique(colormask)
+        vector = np.zeros([colormask.shape[0], colormask.shape[1], colormask.shape[2], 3])
+
+        for id in unique_cells:
+            if id == 0:
+                continue
+
+            idx = colormask == id
+            com = np.where(center == id)
+
+            indicies = np.where(idx)
+
+            z = indicies[0]
+            z_vec = indicies[0]
+
+            y = indicies[1]
+            y_vec = indicies[1]
+
+            x = indicies[2]
+            x_vec = indicies[2]
+
+            z_vec = -z_vec + com[0]
+            y_vec = -y_vec + com[1]
+            x_vec = -x_vec + com[2]
+
+            for i in range(len(z)):
+                vector[z[i], y[i], x[i], :] = [z_vec[i], y_vec[i], x_vec[i]]
+
+        return vector
 
 
 

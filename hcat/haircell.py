@@ -17,7 +17,11 @@ class HairCell:
 
         for z in range(mask.shape[-1]):
             #Assume 488 volume
-            self.volume += 608e-9 * (mask[:,:,z] > 0).sum() * ((163e-9)**2)
+            self.volume += 1000e-9* (mask[:,:,z] > 0).sum() * ((289e-9)**2)
+            # self.volume += 608e-9 * (mask[:,:,z] > 0).sum() * ((163e-9)**2)
+            # BUG THIS IS WRONG
+
+            # for each z plane in the cell, volume = volume + (x_pix_size * y_pix_size * z_pix_size * N_cell_pixels)
 
         if isinstance(image, torch.Tensor):
             image = image.numpy()

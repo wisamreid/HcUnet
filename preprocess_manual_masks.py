@@ -1,35 +1,64 @@
 import skimage.io as io
+import skimage.morphology
+import pickle
+import skimage.morphology
+import matplotlib.pyplot as plt
 import os
 import ray
 import glob
+import numpy as np
 from hcat.train import train_utils
 
-basedir = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/validate/*.labels.tif'
+basedir = 'Data/train/*.labels.tif'
 
 ray.init()
 
 mm = train_utils.makeMask(erosion=True)
 mpwl = train_utils.makePWL()
+com = train_utils.CalculateCenterOfMass()
+pix2center = train_utils.VectorToCenter()
 
 images = glob.glob(basedir)
-print(images)
+
 results = []
-#
+
+
+
+# center_of_mass, colormask  = com(i)
+# mask = mm(i)
+# test = pix2center(center_of_mass, colormask, mask)
+
+
+
 #    NOTES SO YOU ONLY HAVE TO DO THIS ONCE
 #    Please save the amira files as rgb tif's or else it wont work.
 #
 @ray.remote
 def make_mask(image_path):
+
     image = mm(image_path)
+    center_of_mass, colormask = com(image_path)
+    vector = pix2center(center_of_mass, colormask, image)
+
     basename = os.path.splitext(image_path)[0]
     basename = basename
-    io.imsave(basename+'.mask.tif', image)
-    pwl = mpwl(basename+'.mask.tif')
-    print(f'PWL MAX ray: {pwl.max()}')
-    io.imsave(basename+'.pwl.tif', pwl)
-    image = train_utils.colormask_to_mask(image)
-    io.imsave(basename+'.mask.tif', image)
-    print(basename, ' DONE')
+    pickle.dump(vector, open(basename + '.vector.pkl', 'wb'))
+
+    for i in range(3):
+        center_of_mass = skimage.morphology.binary_erosion(center_of_mass > 0)
+    io.imsave(basename+'.com.tif', center_of_mass.astype(np.uint8))
+
+
+    # io.imsave(basename+'.mask.tif', image)
+
+    # pwl = mpwl(basename+'.mask.tif')
+    # print(f'PWL MAX ray: {pwl.max()}')
+    #
+    # io.imsave(basename+'.pwl.tif', pwl)
+    # image = train_utils.colormask_to_mask(image)
+    # io.imsave(basename+'.mask.tif', image)
+    # print(basename, ' DONE')
+
     return image
 
 for i in images:

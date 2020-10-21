@@ -7,6 +7,7 @@ import xml.etree.ElementTree
 import glob as glob
 import numpy as np
 import hcat.transforms as t
+import pickle
 
 # Ignore warnings
 import warnings
@@ -184,3 +185,94 @@ class Section(Dataset):
             image = ot(image)
 
         return image, {'boxes': torch.tensor(bbox_loc), 'labels': torch.tensor(class_labels)}
+
+
+class RecursiveStack(Dataset):
+    """
+    Dataloader for hcat.runet
+    Processes 3D images
+
+    Performs
+    """
+    def __init__(self, path, image_transforms, joint_transforms, out_transforms=None):
+        """
+
+        :param path: str
+        :param image_transforms: list
+        :param joint_transforms: list
+        :param out_transforms: list
+        """
+
+        if out_transforms is None:
+            out_transforms = [t.to_tensor()]
+
+        self.image_transforms = image_transforms
+        self.out_transforms = out_transforms
+        self.joint_transforms = joint_transforms
+
+        self.files = glob.glob(f'{path}{os.sep}*.mask.tif')
+
+        if len(self.files) == 0:
+            raise FileExistsError('No Valid Mask Files Found')
+
+        self.image = []
+        self.mask = []
+        self.pwl = []
+        self.com = []
+        self.vec = []
+
+        # Look through all valid files and store them into lists.
+        for mask_path in self.files:
+            try:
+                file_with_mask = os.path.splitext(mask_path)[0]
+                image_data_path = os.path.splitext(file_with_mask)[0] + '.tif'
+                pwl_data_path = os.path.splitext(file_with_mask)[0] + '.pwl.tif'
+                com_data_path = os.path.splitext(file_with_mask)[0] + '.labels.com.tif'
+                vec_data_path = os.path.splitext(file_with_mask)[0] + '.labels.vector.pkl'
+
+                self.image.append(io.imread(image_data_path))
+
+                # Not every mask is the same size. some are [X,Y,Z,C] others are just [X,Y,Z]
+                # We only want [X, Y, Z]
+                try:
+                    self.mask.append(io.imread(mask_path)[:, :, :, 0])
+                except IndexError:
+                    self.mask.append(io.imread(mask_path))
+
+                self.pwl.append(io.imread(pwl_data_path))
+                self.com.append(io.imread(com_data_path)[:, :, :, np.newaxis])
+                self.vec.append(pickle.load(open(vec_data_path, 'rb')))
+            except FileNotFoundError:
+                print(f'ISSUE WITH: {os.path.splitext(mask_path)[0]}')
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, item):
+
+        # Expect files to contain two endings *.mask.tif
+        # with first run of os.path.splitext we remove .tif
+        # with second pass we remove .mask
+
+        image = self.image[item]
+        mask = self.mask[item]
+        pwl = self.pwl[item]
+        com = self.com[item]
+        vec = self.vec[item]
+
+        # We have to assume there is always a channel index at the last dim
+        # So for 3D its [Z,Y,X,C]
+        # 2D: [Y,X,C]
+        mask = np.expand_dims(mask, axis=mask.ndim)
+        pwl = np.expand_dims(pwl, axis=pwl.ndim)
+
+        # May Turn to Torch
+        for jt in self.joint_transforms:
+
+            image, mask, pwl, com, vec = jt([image, mask, pwl, com, vec])
+        for it in self.image_transforms:
+            image = it(image)
+        for ot in self.out_transforms:
+            image, mask, pwl, com, vec = ot([image, mask, pwl, com, vec])
+
+        return image, mask, pwl, com, vec

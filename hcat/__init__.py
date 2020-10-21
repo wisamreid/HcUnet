@@ -21,13 +21,13 @@ __compactness__ = 0.01
 __expand_mask__ = 15
 
 # Seed placement Constants
-__expand_z__ = 3
-__z_tolerance__ = 3
+__expand_z__ = 5
+__z_tolerance__ = 2
 
 
 # Hcat.generate_unique_segmentation_mask_from_probability
 __mask_prob_threshold__ = 0.5
-__cell_prob_threshold__ = 0.5
+__cell_prob_threshold__ = 0.25
 
 # unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
 #                                                                             predicted_cell_candidate_list,

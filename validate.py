@@ -77,6 +77,12 @@ for p in promoter_list:
     for i, f in enumerate(folders):
 
         name = os.path.basename(f[0:-1:1])
+
+        gain = re.search('Gain \d\d\d?', name)
+        laser = re.search('Laser \d.\d\d?', name)
+        if gain is not None or laser is not None:
+            continue
+
         try:
             all_cells = renamed_load(open(f+'all_cells.pkl', 'rb'))
         except FileNotFoundError:
@@ -106,7 +112,7 @@ for p in promoter_list:
         if re.search('Eric', name) is not None:
             promoter = promoter + ' Full'
 
-        if gain is None:
+        if gain is not None:
             gain = ''
         id = promoter + ' ' + animal + ' ' + str(gain) + ' ' + laser
         # print(f'{id}', end=' | ')
@@ -132,7 +138,7 @@ for p in promoter_list:
                 dapi.append(cell.signal_stats['dapi']['mean'])
                 actin.append(cell.signal_stats['actin']['mean'])
 
-        gfp = np.log10(np.array(gfp).flatten().__mul__(2**16) + 1).tolist()
+        gfp = np.array(np.array(gfp).flatten().__mul__(2**16) + 1).tolist()
         myo = np.array(myo).flatten()
         dapi = np.array(dapi).flatten()
         actin = np.array(actin).flatten()

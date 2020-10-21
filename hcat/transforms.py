@@ -299,7 +299,7 @@ class drop_channel:
 
 
 class random_intensity:
-    def __init__(self, range=(.5, 1.5), chance=0):
+    def __init__(self, range=(-30, 30), chance=0):
         self.range = range
         self.chance = chance
 
@@ -312,7 +312,7 @@ class random_intensity:
         if not isinstance(image, np.ndarray):
             raise TypeError(f'Expected image to be of type np.ndarray, not {type(image)}')
 
-        val = np.random.randint(-50, 50, image.shape[-1]) / 100
+        val = np.random.randint(self.range[0], self.range[1], image.shape[-1]) / 100
 
         if image.ndim == 4:
             for c in range(image.shape[-1]):
@@ -358,6 +358,10 @@ class random_crop:
         if not np.all(image.shape[0:-1:1] >= np.array(dim)):
             if image.shape[-2] < dim[-1]:
                 dim[-1] = image.shape[-2]
+            elif image.shape[0] >= dim[0]:
+                dim[0] = image.shape[0]
+            elif image.shape[1] >= dim[1]:
+                dim[1] = image.shape[1]
             else:
                 raise IndexError(f'Output dimensions: {dim} are larger than input image: {image.shape}')
 
@@ -619,17 +623,14 @@ class clean_image:
 
     @joint_transform
     def __call__(self, image, seed):
+        dtype = image.dtype
         image[np.isnan(image)] = 0
         image[np.isinf(image)] = 1
 
-        return image.astype(dtype=image.dtype)
+        return image.astype(dtype=dtype)
 
 
 class add_junk_image:
-    """
-    Simple transform ensuring no nan values are passed to the model.
-    """
-
     def __init__(self, path, channel_index=(0, 2, 3), junk_image_size=(100, 100), normalize=None):
         """
         Take in a path to images that are p junk. Make sure the images are

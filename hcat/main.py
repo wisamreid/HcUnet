@@ -62,7 +62,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
     print('Done', flush=True)
 
     print('Initalizing FasterRCNN:  ', end='', flush=True)
-    faster_rcnn = hcat.rcnn(path='/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Aug20_13:49.pth')
+    faster_rcnn = hcat.rcnn(path='/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Oct14_06:05.pth')
     faster_rcnn.to(device)
     faster_rcnn.eval()
     print('Done', flush=True)
@@ -106,8 +106,11 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             if not os.path.exists(f'pccl{i}_{j}.pkl'):
                 torch.save(predicted_cell_candidate_list, open(f'pccl{i}_{j}.pkl','wb'))
 
-            print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]'
-                  f'[Max Probability: {predicted_cell_candidate_list["scores"].max()}]', flush=True)
+            if len(predicted_cell_candidate_list["scores"]) > 0:
+                print(f'Done [Predicted {len(predicted_cell_candidate_list["scores"])} cells]'
+                      f'[Max Probability: {predicted_cell_candidate_list["scores"].max()}]', flush=True)
+            else:
+                print(f'Done [No Cells Predicted -> {predicted_cell_candidate_list}]')
 
             # We now want to predict the semantic segmentation mask for the chunk.
             print(f'\tPredicting segmentation mask for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
@@ -131,19 +134,27 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
             # # Now take the segmentation mask, and list of cell candidates and uniquely segment the cells.
             print(f'\tAssigning cell labels for [{x_ind[j - 1]}:{x} , {y_ind[i - 1]}:{y}]:', end=' ', flush=True)
 
-            unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
-                                                                                        predicted_cell_candidate_list,
-                                                                                        image_slice,
-                                                                                        cell_prob_threshold=hcat.__cell_prob_threshold__,
-                                                                                        mask_prob_threshold=hcat.__mask_prob_threshold__)
+            if os.path.exists(f'unique_mask{i}_{j}.pkl'):
+                unique_mask = torch.load(open(f'unique_mask{i}_{j}.pkl','rb'))
+            else:
+                unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
+                                                                                            predicted_cell_candidate_list,
+                                                                                            image_slice,
+                                                                                            cell_prob_threshold=hcat.__cell_prob_threshold__,
+                                                                                            mask_prob_threshold=hcat.__mask_prob_threshold__)
+
             print('Done', flush=True)
             torch.save(unique_mask, open(f'unique_mask{i}_{j}.pkl','wb'))
 
             print(f'\tAssigning cell objects:', end=' ', flush=True)
-            cell_list = hcat.generate_cell_objects(image_slice, unique_mask, cell_candidates=predicted_cell_candidate_list,
-                                                   y_ind_chunk=y_ind[i - 1],
-                                                   x_ind_chunk=x_ind[j - 1])
-            all_cells = all_cells + cell_list
+            if os.path.exists(f'all_cells.pkl.pkl'):
+                if not all_cells:
+                    all_cells = pickle.load(open('all_cells.pkl', 'rb'))
+            else:
+                cell_list = hcat.generate_cell_objects(image_slice, unique_mask, cell_candidates=predicted_cell_candidate_list,
+                                                       y_ind_chunk=y_ind[i - 1],
+                                                       x_ind_chunk=x_ind[j - 1])
+                all_cells = all_cells + cell_list
             print('Done', flush=True)
 
             if show_plots or save_plots:
@@ -223,7 +234,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 
 if __name__ =='__main__':
 
-    base = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
+    base = '/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
     # base = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/maskfiles/'
     # path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/validate/Mar 6 AAV2-PHP.B-CMV11 m5.lif - m5.tif'
     path = None
