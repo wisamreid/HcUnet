@@ -9,13 +9,14 @@ import time
 import sys
 # path = '/media/DataStorage/ToAnalyze/'
 # analyzed_path = '/media/DataStorage/ToAnalyze/'
-path = '/media/DataStorage/ToAnalyze/'
-analyzed_path = '/media/DataStorage/ToAnalyze/'
+path = '/media/DataStorage/AAV injection results/**/**/'
+analyzed_path = '/media/DataStorage/AAV injection results/**/**/'
 image_files = glob.glob(path + '*.tif')
-os.chdir(path)
+# os.chdir(path)
 gfp = []
 
 for image_loc in image_files:
+    os.chdir(os.path.split(image_loc)[0])
     start_time = time.asctime()
     print('\x1b[1;32m' + f'Analyzing:' + '\x1b[0m' + f'{image_loc}')
     print(f'\t Start: '+ '\x1b[1;34m' +f'{start_time}'+ '\x1b[0m')
@@ -28,10 +29,13 @@ for image_loc in image_files:
     os.chdir(foldername + '_cellBycell')
 
     if os.path.exists('./analysis.lock'):
+        if os.path.exists('all_cells.csv'):
+            os.rename('./all_cells.csv', os.path.split(foldername)[1]+'.csv')
         print('\x1b[3;31m' + f'Anaysis was previously computed. Skipping this image...' + '\x1b[0m')
         os.chdir('..')
         print(' ')
         continue
+
 
     try:
         os.mkdir('./maskfiles')

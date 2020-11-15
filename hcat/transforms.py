@@ -374,13 +374,14 @@ class random_crop:
 
             x = int(np.random.randint(0, shape[0] - dim[0] + 1, 1))
             y = int(np.random.randint(0, shape[1] - dim[1] + 1, 1))
-            if dim[2] > shape[2]:
+
+            if dim[2] < shape[2]:
                 z = int(np.random.randint(0, shape[2] - dim[2] + 1, 1))
             else:
                 z = 0
                 dim[2] = shape[2]
 
-            out = image[x:x + dim[0] - 1:1, y:y + dim[1] - 1:1, z:z + dim[2] - 1:1, :]
+            out = image[x:x + dim[0]:1, y:y + dim[1]:1, z:z + dim[2]:1, :]
 
         elif image.ndim == 3:  # 2D image
             shape = image.shape

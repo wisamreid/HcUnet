@@ -101,8 +101,18 @@ class makeMask:
         # EVERYTHING IS [Z,Y,X,C]
         ogimage = io.imread(imagepath)
 
+        # ogimage can be either RGB image, with ndim=4, or a uint8 image with ndim=3
+        # in the RGB case, different colors represent dif cells
+        # in the uint8 case, diff integers represent different cells
+        if ogimage.ndim == 3:
+            ogimage = np.stack((ogimage, ogimage, ogimage), axis=3)
+
         image = np.copy(ogimage)
-        background = np.copy(image[0, 0, 0, :])
+
+        try:
+            background = np.copy(image[0, 0, 0, :])
+        except:
+            raise ValueError(imagepath, image.shape)
 
         image = self.set_background(image, background)
 
@@ -183,7 +193,12 @@ class CalculateCenterOfMass:
     def __call__(self, imagepath):
         # EVERYTHING IS [Z,Y,X,C]
         ogimage = io.imread(imagepath)
+
+        if ogimage.ndim == 3:
+            ogimage = np.stack((ogimage, ogimage, ogimage), axis=3)
+
         image = np.copy(ogimage)
+
         background = np.copy(image[0, 0, 0, :])
 
         image = self.set_background(image, background)
@@ -206,7 +221,9 @@ class CalculateCenterOfMass:
             z = int(np.round(center[0]))
             center_of_mass[z, y, x] = id
 
-        return center_of_mass.astype(np.uint8), new_image
+        print('COM MAX IN FUN:', center_of_mass.max())
+
+        return center_of_mass, new_image
 
     @staticmethod
     @njit
@@ -220,7 +237,7 @@ class CalculateCenterOfMass:
         return image
 
 
-class VectorToCenter():
+class VectorToCenter:
     def __init__(self):
         pass
 
@@ -240,22 +257,23 @@ class VectorToCenter():
             indicies = np.where(idx)
 
             z = indicies[0]
-            z_vec = indicies[0]
-
             y = indicies[1]
-            y_vec = indicies[1]
-
             x = indicies[2]
-            x_vec = indicies[2]
 
-            z_vec = -z_vec + com[0]
-            y_vec = -y_vec + com[1]
-            x_vec = -x_vec + com[2]
+            z_vec = -com[0] + z
+            y_vec = -com[1] + y
+            x_vec = -com[2] + x
 
             for i in range(len(z)):
                 vector[z[i], y[i], x[i], :] = [z_vec[i], y_vec[i], x_vec[i]]
 
+        vector[:,:,:,0] /= vector.shape[0]
+        vector[:,:,:,1] /= vector.shape[1]
+        vector[:,:,:,2] /= vector.shape[2]
+
         return vector
+
+
 
 
 

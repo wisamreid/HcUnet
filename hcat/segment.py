@@ -1,4 +1,6 @@
 import torch
+from scipy import ndimage as ndi
+from numba import njit
 import numpy as np
 import matplotlib.pyplot as plt
 import skimage.exposure
@@ -518,8 +520,6 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
             FROM PAST CHRIS...
 
 
-
-
     :param image: [B,C,X,Y,Z] torch tensor
     :param unique_mask: [X,Y,Z] numpy array
     :return:
@@ -560,3 +560,102 @@ def generate_cell_objects(image: torch.Tensor,  unique_mask, cell_candidates, x_
         print('\b', end='')
 
     return cell_list
+
+
+def pixel_vec_to_cell(vector: torch.Tensor, mask: torch.Tensor):
+    """
+    Expect vector to be [1, 3, X, Y, Z] where ind 1, shape 3 is vector [Z,Y,X]
+
+    get indicies ->
+    calculate center from each indicies ->
+    new matrix of centers (heatmap?) ->
+    take local max (num cells!) ->
+    project each pixel to closest center (label) ->
+
+    :param vector: torch.Tensor [B, 3, X, Y, Z]
+    :param mask: torch.Tensor  [B, 1, X, Y, Z]
+    :return:
+    """
+
+    vec_shape = vector.shape[2::]
+    indicies = torch.from_numpy(np.indices(vec_shape)) # [3, X, Y, Z] where index 0 == [x,y,z]
+    print(indicies.shape)
+
+    assert vec_shape[0] == indicies.shape[1]
+    assert vec_shape[1] == indicies.shape[2]
+    assert vec_shape[2] == indicies.shape[3]
+
+    assert indicies[2].max() == vec_shape[-1] - 1
+    assert indicies[1].max() == vec_shape[-2] - 1
+    assert indicies[0].max() == vec_shape[-3] - 1
+
+    centers = indicies.float() #+ vector.squeeze(0).float()
+    centers[0,:,:,:] += vector.squeeze(0).float()[2,:,:,:]
+    centers[1,:,:,:] += vector.squeeze(0).float()[1,:,:,:]
+    centers[2,:,:,:] += vector.squeeze(0).float()[0,:,:,:]
+
+    print(centers.shape)
+    # centers = skimage.filters.gaussian(centers.numpy())
+    # print(centers.shape)
+
+
+    # Do a histogram in 3d based on numba njit function (see below)
+    hist = hist3d(centers.numpy()) # [3,x,y,z] -> [x,y,z] with values from 0->1
+    hist = ndi.maximum_filter(hist, size=2, mode='constant')
+    hist = skimage.filters.gaussian(hist, sigma=5)
+
+    cells = skimage.feature.peak_local_max(hist, min_distance=1, num_peaks=100)
+
+
+    print(f'Predicted {len(cells)} cell from runet output')
+    label = np.zeros(hist.shape)
+    min_dist = np.ones(hist.shape) * 100000
+
+    for i, c in enumerate(cells):
+        #c = [x,y,z]
+
+        m = np.copy(centers.numpy())
+        m[0, :, :, :] -= c[0]
+        m[1, :, :, :] -= c[1]
+        m[2, :, :, :] -= c[2]
+        m_dist = np.sqrt(m[0,:,:,:]**2 + m[1,:,:,:]**2 + m[2,:,:,:]**2)
+        label[min_dist > m_dist] = i
+        min_dist[min_dist > m_dist] = m_dist[min_dist > m_dist]
+
+    if mask.ndim == 5:
+        mask = mask[0,0,:,:,:]
+
+    label[mask.float() < 0.2] = 0
+
+    return label
+
+
+@njit
+def hist3d(mat:np.ndarray) -> np.ndarray:
+    """
+    Expects mat of size [3, x,y,z] where ind 0 is coordinates for a point: [z,y,x]
+
+    :param mat:
+    :return:
+    """
+
+    hist = np.ones(mat.shape[1::])
+    shape = mat.shape
+    np.ascontiguousarray(mat)
+    for z in range(shape[-1]):
+        for y in range(shape[-2]):
+            for x in range(shape[-3]):
+                # ind is [z,y,x] for some reason
+                ind = np.floor(mat[:, x, y, z])
+
+                if ind[0] < 0 or ind[0] >= shape[-3]:
+                    continue
+                if ind[1] < 0 or ind[1] >= shape[-2]:
+                    continue
+                if ind[2] < 0 or ind[2] >= shape[-1]:
+                    continue
+
+                hist[int(ind[0]), int(ind[1]), int(ind[2])] += 1
+
+    return hist / hist.max()
+

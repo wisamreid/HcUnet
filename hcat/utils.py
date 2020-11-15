@@ -27,8 +27,10 @@ import GPy
 
 import matplotlib.pyplot as plt
 
+from typing import Dict, Tuple, List
 
-def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
+
+def pad_image_with_reflections(image: torch.Tensor, pad_size: Tuple[int] = (30, 30, 6)) -> torch.Tensor:
     """
     Pads image according to Unet spec
     expect [B, C, X, Y, Z]
@@ -72,7 +74,7 @@ def pad_image_with_reflections(image, pad_size=(30, 30, 6)):
     return torch.cat((bottom_pad, image, top_pad), dim=4)
 
 
-def calculate_indexes(pad_size, eval_image_size, image_shape, padded_image_shape):
+def calculate_indexes(pad_size: int, eval_image_size: int, image_shape: int, padded_image_shape: int) -> List[List[int]]:
     """
     This calculates indexes for the complete evaluation of an arbitrarily large image by unet.
     each index is offset by eval_image_size, but has a width of eval_image_size + pad_size * 2.

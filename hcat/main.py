@@ -1,5 +1,6 @@
 import hcat
 from hcat import utils, transforms as t
+from hcat.validate.render_size import render_size
 import hcat.mask
 import skimage.io as io
 import os
@@ -54,7 +55,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                      groups=2).to(device)
 
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/May28_chris-MS-7C37_2.unet')
-    unet.load('/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/Aug21_chris-MS-7C37_1.unet')
+    unet.load('/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/Aug21_chris-MS-7C37_1.unet')
     # unet.load('/home/chris/Dropbox (Partners HealthCare)/HcUnet/Sep8_DISTANCE_chris-MS-7C37_2.unet')
     # test_image_path = '/home/chris/Dropbox (Partners HealthCare)/HcUnet/Data/Feb 6 AAV2-PHP.B PSCC m1.lif - PSCC m1 Merged-test_part.tif'
     unet.to(device)
@@ -62,7 +63,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
     print('Done', flush=True)
 
     print('Initalizing FasterRCNN:  ', end='', flush=True)
-    faster_rcnn = hcat.rcnn(path='/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/fasterrcnn_Oct14_06:05.pth')
+    faster_rcnn = hcat.rcnn(path='/media/DataStorage/Dropbox (Partners HealthCare)/HcUnet/TrainedModels/fasterrcnn_Oct14_06:05.pth')
     faster_rcnn.to(device)
     faster_rcnn.eval()
     print('Done', flush=True)
@@ -136,6 +137,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
 
             if os.path.exists(f'unique_mask{i}_{j}.pkl'):
                 unique_mask = torch.load(open(f'unique_mask{i}_{j}.pkl','rb'))
+                seed = 0
             else:
                 unique_mask, seed = hcat.generate_unique_segmentation_mask_from_probability(predicted_semantic_mask.numpy(),
                                                                                             predicted_cell_candidate_list,
@@ -200,6 +202,8 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
     print('Reconstructing Unique Mask...', end='', flush=True)
     unique_mask=utils.reconstruct_segmented(path_chunk_storage)
     print('Done!', flush=True)
+
+    render_size(unique_mask)
 
     if save_plots:
         print('Saving Instance Mask...', end='', flush=True)

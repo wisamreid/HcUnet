@@ -24,10 +24,11 @@ results = []
 
 
 
-# center_of_mass, colormask  = com(i)
-# mask = mm(i)
-# test = pix2center(center_of_mass, colormask, mask)
+center_of_mass, colormask  = com(images[0])
+mask = mm(images[0])
+test = pix2center(center_of_mass, colormask, mask)
 
+# raise NotImplementedError
 
 
 #    NOTES SO YOU ONLY HAVE TO DO THIS ONCE
@@ -44,9 +45,13 @@ def make_mask(image_path):
     basename = basename
     pickle.dump(vector, open(basename + '.vector.pkl', 'wb'))
 
-    for i in range(3):
+
+    for i in range(5):
         center_of_mass = skimage.morphology.binary_erosion(center_of_mass > 0)
-    io.imsave(basename+'.com.tif', center_of_mass.astype(np.uint8))
+
+    io.imsave(basename+'.com.tif', (center_of_mass > 0).astype(np.uint8))
+
+    # print(len(image.unique()), center_of_mass.max(), colormask.max(), vector.max(), )
 
 
     # io.imsave(basename+'.mask.tif', image)

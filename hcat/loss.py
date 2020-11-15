@@ -22,7 +22,7 @@ def cross_entropy(pred: torch.Tensor, mask: torch.Tensor, pwl: torch.Tensor, met
     :return: torch.float | Average cross entropy loss of all pixels of the predicted mask vs ground truth
     """
 
-    _methods = ['pixel', 'worst_z', 'random']
+    _methods = ['pixel', 'worst_z', 'random','sigmoid']
     if method not in _methods:
         raise ValueError(f'Viable methods for cross entropy loss are {_methods}, not {method}.')
 
@@ -35,7 +35,9 @@ def cross_entropy(pred: torch.Tensor, mask: torch.Tensor, pwl: torch.Tensor, met
         if (mask == 0).sum() == 0:
             raise ValueError(f'There are no background pixels in mask.\n\t(mask==0).sum() == 0 -> True')
 
-
+    if method == 'sigmoid':
+        sig = nn.Sigmoid()
+        pred = sig(pred)
 
     pred_shape = pred.shape
     n_dim = len(pred_shape)
@@ -91,6 +93,10 @@ def cross_entropy(pred: torch.Tensor, mask: torch.Tensor, pwl: torch.Tensor, met
             mask = torch.cat([mask[mask == 1][pos_ind], mask[mask == 0][neg_ind]]).unsqueeze(0)
 
             loss = cel(pred.float(), mask.float())
+            
+    elif method == 'sigmoid':
+        loss = cel(pred.float(), mask.float())
+        loss = (loss * (pwl + 1))
 
     return loss.mean()
 
