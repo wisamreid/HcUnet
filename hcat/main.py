@@ -191,7 +191,7 @@ def analyze(path=None, numchunks=3, save_plots=False, show_plots=False, path_chu
                 path_chunk_storage + '/' + time.strftime("%y-%m-%d_%H-%M_") + str(time.monotonic_ns()) + '.maskpart', 'wb'))
             a = a.mask.astype(np.uint8)[0, 0, :, :, :].transpose(2, 1, 0)
 
-            del unique_mask, seed, predicted_cell_candidate_list, image_slice_frcnn, image_slice
+            del unique_mask, seed, predicted_cell_candidate_list, image_slice_frcnn, image_slice, a
 
     del image
 

@@ -325,8 +325,9 @@ def reconstruct_segmented(path):
         y2 = part.loc[1]+part.shape[3]
         unique = part.segmented_mask.astype(part.dtype)
         unique[unique !=0] = (unique[unique != 0] + max_id)
-        max_id = unique.max()
         mask[:, :, x1:x2, y1:y2, :] = unique
+        max_id = mask.max()
+
         del unique
 
     return mask

@@ -473,8 +473,6 @@ def generate_unique_segmentation_mask_from_probability(predicted_semantic_mask: 
             #Hminima
             # A/B test between matlab watershed and skimage
             # train unet to predict distance map not the class label
-
-
             labels_expanded[labels_expanded == 1] = 0
 
             # Remove correction for nonisotropic voxels from the output
